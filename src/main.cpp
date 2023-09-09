@@ -1,18 +1,42 @@
 #include <Arduino.h>
+#define FASTLED_ESP8266_NODEMCU_PIN_ORDER
+#include <FastLED.h>                     // needed for WS2812B LEDs
 
-// put function declarations here:
-int myFunction(int, int);
+#define LED_PIN     4                    // which pin?
+#define NUM_LEDS    110                   // adjust to your amount of leds on the strip
+#define BRIGHTNESS  200                  // almost full brightness (0-255)
+#define LED_TYPE    WS2812B              // preset for the WS2812B
+#define COLOR_ORDER GRB                  // change if needed
+
+CRGB leds[NUM_LEDS];
+
+void startup();
 
 void setup() {
-  // put your setup code here, to run once:
-  int result = myFunction(2, 3);
+  delay( 300 );                           
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );
+  startup();
 }
 
-void loop() {
-  // put your main code here, to run repeatedly:
+void loop()
+{
+  for (int i = 0; i < NUM_LEDS; i++) {
+    leds[i] = CRGB(255, 69, 0);
+    leds[random(NUM_LEDS)].fadeToBlackBy(random(40,60));
+  }
+  FastLED.show();
+  delay(20);
 }
 
-// put function definitions here:
-int myFunction(int x, int y) {
-  return x + y;
+void startup()
+{
+  for (int f = 0; f < BRIGHTNESS; f++) {
+    for (int i = 0; i < NUM_LEDS; i++) {
+      leds[i] = CRGB(255, 69, 0);
+      FastLED.setBrightness(  f );
+      leds[random(NUM_LEDS)].fadeToBlackBy(255);
+    }
+  FastLED.show();
+  delay(8);
+  }
 }
