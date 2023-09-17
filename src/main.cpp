@@ -3,31 +3,30 @@
 // FastLED configuration
 #define FASTLED_ESP8266_NODEMCU_PIN_ORDER
 #define FASTLED_ALL_PINS_HARDWARE_SPI
-#define LED_PIN     4                    // which pin?
+#define LED_PIN     3                    // which pin? -- pin 4 is used by Edgent
 #define LED_TYPE    WS2812B              // preset for the WS2812B
 #define COLOR_ORDER GRB                  // change if needed
 
 // Blynk configuration
 /* Fill-in information from Blynk Device Info here */
-#define BLYNK_TEMPLATE_ID           "TMPL2wlrA9g8Y"
-#define BLYNK_TEMPLATE_NAME         "Quickstart Template"
-#define BLYNK_AUTH_TOKEN            "fpvsNPJbLDDyqtc61it5aTROP0iwIrca"
+#define BLYNK_TEMPLATE_ID "TMPL2GI5SaWlg"
+#define BLYNK_TEMPLATE_NAME "Thermal Katana"
+//#define BLYNK_AUTH_TOKEN "dj4ewPU05Ra1Du9kHgQP_eOpjyPKVYk7"
+
+#define BLYNK_FIRMWARE_VERSION        "0.1.0"
 
 /* Comment this out to disable prints and save space */
 #define BLYNK_PRINT Serial
 
+#define APP_DEBUG
+#define USE_NODE_MCU_BOARD
+
 
 #include <Arduino.h>
 #include <FastLED.h>                     // needed for WS2812B LEDs
-#include <ESP8266WiFi.h>
-#include <BlynkSimpleEsp8266.h>
+#include "BlynkEdgent.h"
 #include "blade_simulation.h"
 
-
-// Your WiFi credentials.
-// Set password to "" for open networks.
-char ssid[] = "";
-char pass[] = "";
 
 BlynkTimer timer;
 
@@ -68,8 +67,9 @@ void myTimerEvent()
 
 void setup() {
   Serial.begin(115200);
+  delay(100);
   Serial.printf("Starting up!\n");
-  Blynk.begin(BLYNK_AUTH_TOKEN, ssid, pass);
+  BlynkEdgent.begin();
   timer.setInterval(1000L, myTimerEvent);    
 
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );
@@ -79,10 +79,14 @@ void setup() {
 //  startup();
 }
 
-void loop()
+
+
+void app_loop()
 {
-  Blynk.run();
+  edgentTimer.run();
+  edgentConsole.run();
   timer.run();
+  Blynk.run();
 
   static auto last_sim_time = 0;
 
@@ -95,4 +99,8 @@ void loop()
     }
     FastLED.show();
   }
+}
+
+void loop() {
+  BlynkEdgent.run();
 }
