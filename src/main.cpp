@@ -83,7 +83,7 @@ void app_loop()
   edgentTimer.run();
   edgentConsole.run();
   sim_timer.run();
-  Blynk.run();
+  //Blynk.run();
 }
 
 void loop() {
