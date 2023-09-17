@@ -28,10 +28,9 @@
 #include "blade_simulation.h"
 
 
-BlynkTimer timer;
+BlynkTimer sim_timer;
 
 CRGB leds[NUM_LEDS];
-
 
 
 // This function is called every time the Virtual Pin 0 state changes
@@ -54,23 +53,21 @@ BLYNK_CONNECTED()
 }
 
 // This function sends Arduino's uptime every second to Virtual Pin 2.
-void myTimerEvent()
+void sim_timer_event()
 {
-  // You can send any value at any time.
-  // Please don't send more that 10 values per second.
-  Blynk.virtualWrite(V2, millis() / 1000);
+    auto led_values = simulate_temperature();
+    for(auto i = 0U; i < NUM_LEDS; ++i) {
+      leds[i] = HeatColor(led_values[i]);
+    }
+    FastLED.show();
 }
-
-
-
-
 
 void setup() {
   Serial.begin(115200);
   delay(100);
   Serial.printf("Starting up!\n");
   BlynkEdgent.begin();
-  timer.setInterval(1000L, myTimerEvent);    
+  sim_timer.setInterval(20L, sim_timer_event);    
 
   FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );
   FastLED.setBrightness(32);
@@ -85,20 +82,8 @@ void app_loop()
 {
   edgentTimer.run();
   edgentConsole.run();
-  timer.run();
+  sim_timer.run();
   Blynk.run();
-
-  static auto last_sim_time = 0;
-
-  auto time_now = millis();
-  if ((time_now - last_sim_time) > 20) {
-    last_sim_time = time_now;
-    auto led_values = simulate_temperature();
-    for(auto i = 0U; i < NUM_LEDS; ++i) {
-      leds[i] = HeatColor(led_values[i]);
-    }
-    FastLED.show();
-  }
 }
 
 void loop() {
