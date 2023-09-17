@@ -444,6 +444,7 @@ void enterConnectCloud() {
         (Blynk.connected() == false))
   {
     loop_delay(10);
+    Blynk.run();
     if (!BlynkState::is(MODE_CONNECTING_CLOUD)) {
       Blynk.disconnect();
       return;
@@ -496,7 +497,6 @@ void enterError() {
   while (timeoutMs > millis() || g_buttonPressed)
   {
     loop_delay(10);
-    app_loop();
     if (!BlynkState::is(MODE_ERROR)) {
       return;
     }
