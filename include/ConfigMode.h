@@ -151,22 +151,14 @@ String getWiFiNetworkBSSID() {
   return WiFi.BSSIDstr();
 }
 
-static
-void loop_delay(unsigned long period) {
-  period += millis();
-  do { 
-    app_loop();
-  } while ((period - millis()) < (ULONG_MAX/2));  // use wraparound
-}
-
 void enterConfigMode()
 {
   WiFi.mode(WIFI_OFF);
-  loop_delay(100);
+  delay(100);
   WiFi.mode(WIFI_AP_STA);
   WiFi.softAPConfig(WIFI_AP_IP, WIFI_AP_IP, WIFI_AP_Subnet);
   WiFi.softAP(getWiFiName().c_str());
-  loop_delay(500);
+  delay(500);
 
   IPAddress myIP = WiFi.softAPIP();
   if (myIP == (uint32_t)0)
@@ -298,7 +290,7 @@ void enterConfigMode()
     while (wifi_nets < 0 &&
            millis() - t < 20000)
     {
-      loop_delay(20);
+      delay(20);
       wifi_nets = WiFi.scanComplete();
     }
     DEBUG_PRINT(String("Found networks: ") + wifi_nets);
@@ -362,7 +354,7 @@ void enterConfigMode()
   server.begin();
 
   while (BlynkState::is(MODE_WAIT_CONFIG) || BlynkState::is(MODE_CONFIGURING)) {
-    loop_delay(10);
+    delay(10);
     dnsServer.processNextRequest();
     server.handleClient();
     app_loop();
@@ -407,7 +399,8 @@ void enterConnectNet() {
   unsigned long timeoutMs = millis() + WIFI_NET_CONNECT_TIMEOUT;
   while ((timeoutMs > millis()) && (WiFi.status() != WL_CONNECTED))
   {
-    loop_delay(10);
+    delay(10);
+    app_loop();
 
     if (!BlynkState::is(MODE_CONNECTING_NET)) {
       WiFi.disconnect();
@@ -443,7 +436,9 @@ void enterConnectCloud() {
         (!Blynk.isTokenInvalid()) &&
         (Blynk.connected() == false))
   {
-    loop_delay(10);
+    delay(10);
+    Blynk.run();
+    app_loop();
     if (!BlynkState::is(MODE_CONNECTING_CLOUD)) {
       Blynk.disconnect();
       return;
@@ -481,9 +476,9 @@ void enterSwitchToSTA() {
 
   DEBUG_PRINT("Switching to STA...");
 
-  loop_delay(1000);
+  delay(1000);
   WiFi.mode(WIFI_OFF);
-  loop_delay(100);
+  delay(100);
   WiFi.mode(WIFI_STA);
 
   BlynkState::set(MODE_CONNECTING_NET);
@@ -495,14 +490,14 @@ void enterError() {
   unsigned long timeoutMs = millis() + 10000;
   while (timeoutMs > millis() || g_buttonPressed)
   {
-    loop_delay(10);
+    delay(10);
     app_loop();
     if (!BlynkState::is(MODE_ERROR)) {
       return;
     }
   }
   DEBUG_PRINT("Restarting after error.");
-  loop_delay(10);
+  delay(10);
 
   restartMCU();
 }
