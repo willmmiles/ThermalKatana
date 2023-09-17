@@ -7,7 +7,8 @@ constexpr auto AMBIENT = 20;
 constexpr auto KI = 0.0;  // controller parameters
 constexpr auto KD = 0.2;
 constexpr auto dT = 0.1;  // "delta-T"
-constexpr auto TARGET = 5000;  // target temperature
+constexpr auto CONTROL_MAX = 200; // degrees per tick
+auto TARGET = 5000;  // target temperature
 
 typedef Eigen::Array<int,NUM_LEDS,1> temperature_array_t;
 temperature_array_t temperature = temperature_array_t::Constant(AMBIENT);
@@ -19,7 +20,6 @@ static void print_array(T& array) {
   for (int i = 0; i < array.size(); ++i) Serial.printf(" %d", array[i]);
   Serial.println(" ]");
 }
-
 
 temperature_array_t smooth_temperatures(const temperature_array_t &input) {
   temperature_array_t output = temperature_array_t::Zero();;
@@ -56,7 +56,7 @@ temperature_array_t cool(const temperature_array_t &input, int ambient) {
 temperature_array_t control(const temperature_array_t &input, float ki, float kd, int target, Eigen::Array<float,NUM_LEDS,1>& integral) {
     auto error = Eigen::Array<float,NUM_LEDS,1> { (target - input).cast<float>() };
     integral += error * dT;
-    return ((kd * error) + (ki * integral)).cast<int>();
+    return ((kd * error) + (ki * integral)).cast<int>().cwiseMax(0).cwiseMin(CONTROL_MAX);
 }
 
 
@@ -81,3 +81,7 @@ led_value_t simulate_temperature() {
   return (temperature / 40).cast<uint8_t>();
 }
 
+
+void setTargetTemperature(int degrees_k) {
+  TARGET = degrees_k;
+}

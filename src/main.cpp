@@ -38,10 +38,9 @@ BLYNK_WRITE(V0)
 {
   // Set incoming value from pin V0 to a variable
   int value = param.asInt();
-
-  // Update state
-  Blynk.virtualWrite(V1, value);
+  setTargetTemperature(value);
 }
+ 
 
 // This function is called every time the device is connected to the Blynk.Cloud
 BLYNK_CONNECTED()
@@ -75,7 +74,6 @@ void setup() {
   FastLED.setMaxPowerInVoltsAndMilliamps(3.7,1000); 
 //  startup();
 }
-
 
 
 void app_loop()
