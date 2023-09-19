@@ -34,6 +34,18 @@ BlynkTimer sim_timer;
 
 CRGB leds[NUM_LEDS];
 
+// Enum index to ap
+const std::array<decltype(HeatColors_p)*, 7> palette_map = {
+  &HeatColors_p,
+  &PartyColors_p,
+  &RainbowColors_p,
+  &CloudColors_p,
+  &LavaColors_p,
+  &OceanColors_p,
+  &ForestColors_p
+};
+decltype(HeatColors_p)* active_palette = palette_map[0];
+
 // This function is called every time the Virtual Pin 0 state changes
 BLYNK_WRITE(V0)
 {
@@ -42,6 +54,14 @@ BLYNK_WRITE(V0)
   setTargetTemperature(value);
 }
  
+BLYNK_WRITE(V3)
+{
+  int value = param.asInt();
+  if ((value >= 0) && (value < (int)palette_map.size())) {
+    active_palette = palette_map[value];
+  }
+}
+
 
 // This function is called every time the device is connected to the Blynk.Cloud
 BLYNK_CONNECTED()
@@ -59,7 +79,8 @@ void sim_timer_event()
 
     auto led_values = simulate_temperature();
     for(auto i = 0U; i < NUM_LEDS; ++i) {
-      leds[i] = HeatColor(led_values[i]);
+      //leds[i] = HeatColor(led_values[i]);
+      leds[i] = ColorFromPalette(*active_palette, led_values[i], 128);
     }
     FastLED.show();
 }
