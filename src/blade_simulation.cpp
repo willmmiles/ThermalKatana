@@ -24,7 +24,8 @@ static void print_array(T& array) {
 temperature_array_t smooth_temperatures(const temperature_array_t &input) {
   temperature_array_t output = temperature_array_t::Zero();;
   //const Eigen::Vector<int, 5> smoothing_kernel = { 13,	1573,	6828,	1573,	13 };
-  const Eigen::Vector<int, 3> smoothing_kernel = { 1500,	7000,	1500 }	;
+  //const Eigen::Vector<int, 3> smoothing_kernel = { 1500,	7000,	1500 }	;
+  const Eigen::Vector<int, 3> smoothing_kernel = { 900,	8200,	900 }	;
   const auto magnitude = smoothing_kernel.sum();
   const auto half_kernel_size = (smoothing_kernel.size()/2);
   const auto inner_size = input.size() - smoothing_kernel.size();
