@@ -9,8 +9,8 @@
     #warning "This board does not have a button. Connect a button to gpio0 <> GND"
   #endif
 
-  #define BOARD_BUTTON_PIN            0
-  #define BOARD_BUTTON_ACTIVE_LOW     true
+  //#define BOARD_BUTTON_PIN            14
+  //#define BOARD_BUTTON_ACTIVE_LOW     true
 
   #define BOARD_LED_PIN               2
   #define BOARD_LED_INVERSE           true
