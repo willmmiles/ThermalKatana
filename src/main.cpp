@@ -78,13 +78,15 @@ BLYNK_CONNECTED()
 // This function sends Arduino's uptime every second to Virtual Pin 2.
 void sim_timer_event()
 {
+    static auto bright_pixel = 0U;
     read_dmp();
 
     auto led_values = simulate_temperature();
     for(auto i = 0U; i < NUM_LEDS; ++i) {
       //leds[i] = HeatColor(led_values[i]);
-      leds[i] = ColorFromPalette(*active_palette, led_values[i], 128);
+      leds[i] = ColorFromPalette(*active_palette, led_values[i], i == bright_pixel ? 255 : 128);
     }
+    bright_pixel = (bright_pixel + 1) % NUM_LEDS;
     FastLED.show();
 }
 
