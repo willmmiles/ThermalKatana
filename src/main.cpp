@@ -106,7 +106,7 @@ void setup() {
 
   sim_timer.setInterval(20L, sim_timer_event);    
   BlynkEdgent.begin();
-
+};
 
 
 void app_loop()
