@@ -37,8 +37,9 @@ void init_dmp() {
     if (devStatus == 0) {
         // Calibration Time: generate offsets and calibrate our MPU6050
         mpu.CalibrateAccel(6);
-        mpu.CalibrateGyro(6);
+        mpu.CalibrateGyro(6);        
         mpu.PrintActiveOffsets();
+        mpu.setRate(20);
         // turn on the DMP, now that it's ready
         Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
@@ -56,11 +57,13 @@ void init_dmp() {
 
 void read_dmp()
 {
+
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
         // display quaternion values in easy matrix form: w x y z
         Quaternion q;
-        mpu.dmpGetQuaternion(&q, fifoBuffer);
+        mpu.dmpGetQuaternion(&q, fifoBuffer);        
+/*
         Serial.print("quat\t");
         Serial.print(q.w);
         Serial.print("\t");
@@ -69,6 +72,10 @@ void read_dmp()
         Serial.print(q.y);
         Serial.print("\t");
         Serial.println(q.z);
+*/                
   };
+    // TODO: I think we want the *difference* between this and prev gyro angles, eg. rotational velocity
+    // We can then "charge" the brightness with the rotational velocity used.
+
 }
 
