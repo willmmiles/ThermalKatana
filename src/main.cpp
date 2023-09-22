@@ -32,7 +32,7 @@ extern void read_dmp(); // TODO
 
 BlynkTimer sim_timer;
 
-CRGB leds[NUM_LEDS];
+std::array<CRGB,NUM_LEDS> leds;
 
 // Enum index to ap
 const std::array<decltype(HeatColors_p)*, 7> palette_map = {
@@ -91,19 +91,20 @@ void sim_timer_event()
 
 void setup() {
   Serial.begin(115200);
-  delay(100);
   Serial.printf("Starting up!\n");
+
+  // Show an indicator LED while we start up
+  leds.fill({0,0,0});
+  leds[0].r = 128;
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds.data(), leds.size()).setCorrection( TypicalLEDStrip );
+  FastLED.setBrightness(20);
+  FastLED.show();
+
   init_dmp();
 
-  BlynkEdgent.begin();
   sim_timer.setInterval(20L, sim_timer_event);    
+  BlynkEdgent.begin();
 
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds, NUM_LEDS).setCorrection( TypicalLEDStrip );
-  FastLED.setBrightness(32);
-  // TODO: tune this value
-  FastLED.setMaxPowerInVoltsAndMilliamps(3.7,1000); 
-//  startup();
-}
 
 
 void app_loop()
