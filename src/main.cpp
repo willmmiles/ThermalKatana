@@ -62,6 +62,13 @@ BLYNK_WRITE(V3)
   }
 }
 
+BLYNK_WRITE(V5)
+{
+  int value = param.asInt();
+  FastLED.setBrightness(value);
+}
+
+
 
 // This function is called every time the device is connected to the Blynk.Cloud
 BLYNK_CONNECTED()
