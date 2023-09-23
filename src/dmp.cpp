@@ -10,7 +10,7 @@
 #include "MPU6050_6Axis_MotionApps20.h"
 #include "dmp.h"
 
-constexpr auto EEPROM_CONFIG_START = 0x800;
+constexpr auto EEPROM_CONFIG_START = 0x100;
 constexpr auto EEPROM_MAGIC = 0xDDAADD00;
 
 // Global object
@@ -18,8 +18,8 @@ MPU6050 mpu;
 
 struct dmp_config {
   int32_t magic;  // are we good?
-  int16_t gyro_offset[3]; // 94, -20, -20
-  int16_t accel_offset[3];
+  int16_t gyro_offset[3]; // 94, -20, -20 for katana;  53,  -18, 30 for test board
+  int16_t accel_offset[3];  // test board: -1250, -6433, 1345
 };
 
 auto active_config = dmp_config {};
@@ -49,23 +49,28 @@ void init_dmp() {
     EEPROM.get(EEPROM_CONFIG_START, active_config);
     if (!(active_config.magic == EEPROM_MAGIC)) {     
       memset(&active_config, 0, sizeof(active_config));
-      active_config.magic = EEPROM_MAGIC;      
+      active_config.magic = EEPROM_MAGIC;
+      // Default to the "factory trim" values
+      active_config.accel_offset[0] = mpu.getAccelXSelfTestFactoryTrim();
+      active_config.accel_offset[1] = mpu.getAccelYSelfTestFactoryTrim();
+      active_config.accel_offset[2] = mpu.getAccelZSelfTestFactoryTrim();
     }
     mpu.setXGyroOffset(active_config.gyro_offset[0]);
     mpu.setYGyroOffset(active_config.gyro_offset[1]);
     mpu.setZGyroOffset(active_config.gyro_offset[2]);
     mpu.setXAccelOffset(active_config.accel_offset[0]);
-    mpu.setYAccelOffset(active_config.accel_offset[0]);
-    mpu.setZAccelOffset(active_config.accel_offset[0]);
+    mpu.setYAccelOffset(active_config.accel_offset[1]);
+    mpu.setZAccelOffset(active_config.accel_offset[2]);
 
+    Serial.printf("Factory trim: %d, %d ,%d\n",mpu.getAccelXSelfTestFactoryTrim(),mpu.getAccelYSelfTestFactoryTrim(),mpu.getAccelZSelfTestFactoryTrim());
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
         // Calibration Time: generate offsets and calibrate our MPU6050
-        mpu.CalibrateAccel(6);
-        mpu.CalibrateGyro(6);        
+        //mpu.CalibrateAccel(6);
+        //mpu.CalibrateGyro(6);        
         mpu.PrintActiveOffsets();
-        mpu.setRate(20);
+        mpu.setRate(4);
         // turn on the DMP, now that it's ready
         Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
@@ -91,6 +96,7 @@ void dmp_setOffset(dmp_axis axis, int16_t value) {
     case dmp_axis::accel_z: active_config.accel_offset[2] = value; mpu.setZAccelOffset(value); break;       
   }
   EEPROM.put(EEPROM_CONFIG_START, active_config);
+  EEPROM.commit();
 }
 
 
@@ -110,7 +116,9 @@ void read_dmp()
       mpu.dmpGetQuaternion(&q, fifoBuffer);        
       mpu.dmpGetAccel(&aa, fifoBuffer);
       mpu.dmpGetGravity(&gravity, &q);
-      mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);        
+      mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);    
+      VectorInt16 aaRaw;
+      mpu.getAcceleration(&aaRaw.x, &aaRaw.y, &aaRaw.z);
 
       // Uplift to a more fully-featured math library
       auto eq = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
@@ -122,8 +130,9 @@ void read_dmp()
         // derive acceleration
         auto end_accel = linear_velocity - last_end_v;
         auto handle_accel = aaReal.getMagnitude();
-
-        Serial.printf("HA: %f   EA: %f\n",handle_accel, end_accel);
+        
+        // dump raw accel data for calibration
+        //Serial.printf("%d, %d, %d, %d, %d, %d\n", aa.x, aa.y, aa.z, aaRaw.x, aaRaw.y, aaRaw.z);
 
       } else {
         first_time = false;

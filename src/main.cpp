@@ -109,10 +109,12 @@ void setup() {
   FastLED.setBrightness(20);
   FastLED.show();
 
-  init_dmp();
-
   sim_timer.setInterval(20L, sim_timer_event);    
   BlynkEdgent.begin();
+
+  // embiggen the eeprom range for dmp calibration
+  EEPROM.begin(0x200);
+  init_dmp();
 };
 
 
