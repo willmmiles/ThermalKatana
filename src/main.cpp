@@ -31,6 +31,7 @@
 BlynkTimer sim_timer;
 
 std::array<CRGB,NUM_LEDS> leds;
+typedef Eigen::Array<uint16_t, NUM_LEDS, 1> brightness_array_t;
 
 // Enum index to ap
 const std::array<decltype(HeatColors_p)*, 7> palette_map = {
@@ -48,9 +49,11 @@ decltype(HeatColors_p)* active_palette = palette_map[0];
 BLYNK_WRITE(V0)
 {
   // Set incoming value from pin V0 to a variable
-  int value = param.asInt();
-  setTargetTemperature(value);
+  set_target_temperature(param.asInt());
 }
+
+BLYNK_WRITE(V1) { set_kd(param.asFloat()); }
+BLYNK_WRITE(V2) { set_ki(param.asFloat()); }
  
 BLYNK_WRITE(V3)
 {
@@ -80,18 +83,72 @@ BLYNK_CONNECTED()
 {
 }
 
+void sparkle(brightness_array_t& array) {
+  constexpr int pixel_count[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2 };
+  static brightness_array_t history;
+  history /= 5;
+  
+  auto n_pixels = random(sizeof(pixel_count) / sizeof(int));
+  for (int i = 0; i < pixel_count[n_pixels]; i++) {
+    auto j = random(NUM_LEDS);
+    history[j] = 120;
+  }
+  array += history;
+};
+
+void wave(led_value_t& values) {
+  static size_t start_index = 0;
+  constexpr uint16_t wave_values[] = { 1, 1, 2, 3, 4, 5, 4, 3, 2, 1, 1 };
+  for (auto i = 0U; i < sizeof(wave_values) / sizeof(uint16_t); ++i) {
+    values[(start_index + i) % NUM_LEDS] += wave_values[i] * 1000;
+  };
+  start_index = (start_index + 1) % NUM_LEDS;
+}
+
+void energy_forward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy) {
+  static brightness_array_t state;
+  static size_t index = 0;
+
+  state[index] = new_energy;
+  for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
+    auto state_index = (led_index + index) % NUM_LEDS;
+    brightness[led_index] += state[state_index];
+    values[led_index] += 50*state[state_index];
+  }
+  if (index) { --index; } else { index = NUM_LEDS - 1; };
+};
+
+void energy_backward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy) {
+  static brightness_array_t state;
+  static size_t index = NUM_LEDS - 1;
+
+  state[index] = new_energy;
+  for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
+    auto state_index = (led_index + index) % NUM_LEDS;
+    brightness[led_index] += state[state_index];
+    values[led_index] += 50*state[state_index];
+  }
+  if (index == NUM_LEDS) { index = 0; } else { ++index; };
+};
+
 // This function sends Arduino's uptime every second to Virtual Pin 2.
 void sim_timer_event()
 {
-    static auto bright_pixel = 0U;
-    read_dmp();
-
+    auto accel_values = read_dmp();
     auto led_values = simulate_temperature();
+    auto led_brightness = brightness_array_t { brightness_array_t::Constant(128) };
+
+    // Apply effects
+    sparkle(led_brightness);
+    //wave(led_values);
+
+    energy_forward(led_values, led_brightness, accel_values[0] / 200);
+    //energy_backward(led_values, led_brightness, accel_values[0] / 200);
+
     for(auto i = 0U; i < NUM_LEDS; ++i) {
       //leds[i] = HeatColor(led_values[i]);
-      leds[i] = ColorFromPalette(*active_palette, led_values[i], i == bright_pixel ? 255 : 128);
+      leds[i] = ColorFromPalette(*active_palette, (led_values[i] / 40) % 256, led_brightness[i]);
     }
-    bright_pixel = (bright_pixel + 1) % NUM_LEDS;
     FastLED.show();
 }
 
