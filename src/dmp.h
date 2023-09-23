@@ -1,6 +1,7 @@
 // DMP-related calls
 
 #include <cstdint>
+#include "eigen.h"
 
 #pragma once
 
@@ -15,6 +16,7 @@ enum class dmp_axis {
 
 void init_dmp();
 
-void dmp_setOffset(dmp_axis, int16_t value);
+void dmp_set_offset(dmp_axis, int16_t value);
+void dmp_save_offset();
 
-void read_dmp();    // todo: return type
+Eigen::Vector2f read_dmp();

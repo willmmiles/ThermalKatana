@@ -28,9 +28,6 @@
 #include "blade_simulation.h"
 #include "dmp.h"
 
-extern void init_dmp();
-extern void read_dmp(); // TODO
-
 BlynkTimer sim_timer;
 
 std::array<CRGB,NUM_LEDS> leds;
@@ -70,12 +67,13 @@ BLYNK_WRITE(V5)
 }
 
 
-BLYNK_WRITE(V50) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
-BLYNK_WRITE(V51) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
-BLYNK_WRITE(V52) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
-BLYNK_WRITE(V53) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
-BLYNK_WRITE(V54) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
-BLYNK_WRITE(V55) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V50) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V51) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V52) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V53) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V54) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V55) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V56) { dmp_save_offset(); };
 
 // This function is called every time the device is connected to the Blynk.Cloud
 BLYNK_CONNECTED()
