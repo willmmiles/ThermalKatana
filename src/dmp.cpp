@@ -12,6 +12,9 @@
 
 constexpr auto EEPROM_CONFIG_START = 0x100;
 constexpr auto EEPROM_MAGIC = 0xDDAADD00;
+constexpr auto ESTIMATED_G = 9.801;  // m/s^2
+constexpr auto ESTIMATED_G_COUNTS = 8350.;
+
 
 // Global object
 MPU6050 mpu;
@@ -66,10 +69,7 @@ void init_dmp() {
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
-        // Calibration Time: generate offsets and calibrate our MPU6050
-        //mpu.CalibrateAccel(6);
-        //mpu.CalibrateGyro(6);        
-        mpu.PrintActiveOffsets();
+        //mpu.PrintActiveOffsets();
         mpu.setRate(4);
         // turn on the DMP, now that it's ready
         Serial.println(F("Enabling DMP..."));
@@ -103,8 +103,8 @@ void dmp_setOffset(dmp_axis axis, int16_t value) {
 void read_dmp()
 {
   static auto first_time = false; // todo this in setup
-  static auto last_gyro_angle = Eigen::Quaternion<float> { };
-  static auto last_end_v = 0.;
+  static auto last_position = Eigen::Vector3f { };
+  static auto last_end_v = Eigen::Vector3f { 0, 0 ,0 };
 
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
@@ -122,14 +122,21 @@ void read_dmp()
 
       // Uplift to a more fully-featured math library
       auto eq = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
+      // Compute new end position
+      auto tip_position = eq * Eigen::Vector3f { 0, (ESTIMATED_G_COUNTS / ESTIMATED_G), 0 }; // 1 "m" in acc counts (G~=8500)
+
+      // TODO: on the first few samples, measure local G direction.  Our initial direction is always zero regardless of the orientation.
+      // We do have a risk of gyro drift, but we hope it's small enough to ignore over the lifetime of our system
+
       if (!first_time) {
-        auto angular_distance = eq.angularDistance(last_gyro_angle);
-        // convert to linear distance
-        auto linear_distance = sin(angular_distance / 2) * (2 * 1); // r=~1m
-        auto linear_velocity = linear_distance * 50;  // Hz
-        // derive acceleration
-        auto end_accel = linear_velocity - last_end_v;
-        auto handle_accel = aaReal.getMagnitude();
+        Eigen::Vector3f delta_pos = (tip_position - last_position) * 50; // "counts" per second
+        Eigen::Vector3f tip_acc = (last_end_v - delta_pos) ; // "counts" per second^2
+
+        auto end_accel = (tip_acc - Eigen::Map<Eigen::Vector<int16_t,3>>(&aa.x).cast<float>()).norm();
+        auto handle_accel = aa.getMagnitude();
+
+        // good, good!
+        Serial.printf("%f, %f\n",handle_accel, end_accel);
         
         // dump raw accel data for calibration
         //Serial.printf("%d, %d, %d, %d, %d, %d\n", aa.x, aa.y, aa.z, aaRaw.x, aaRaw.y, aaRaw.z);
@@ -137,7 +144,7 @@ void read_dmp()
       } else {
         first_time = false;
       }
-      last_gyro_angle = eq;
+      last_position = tip_position;
   };
     // TODO: I think we want the *difference* between this and prev gyro angles, eg. rotational velocity
     // We can then "charge" the brightness with the rotational velocity used.
