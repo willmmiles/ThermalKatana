@@ -26,6 +26,7 @@
 #include <FastLED.h>                     // needed for WS2812B LEDs
 #include "BlynkEdgent.h"
 #include "blade_simulation.h"
+#include "dmp.h"
 
 extern void init_dmp();
 extern void read_dmp(); // TODO
@@ -69,6 +70,12 @@ BLYNK_WRITE(V5)
 }
 
 
+BLYNK_WRITE(V50) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V51) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V52) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V53) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V54) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
+BLYNK_WRITE(V55) { dmp_setOffset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
 
 // This function is called every time the device is connected to the Blynk.Cloud
 BLYNK_CONNECTED()

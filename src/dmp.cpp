@@ -5,13 +5,24 @@
 #include <Eigen/Geometry>
 
 #include <Arduino.h>
+#include <EEPROM.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
+#include "dmp.h"
 
+constexpr auto EEPROM_CONFIG_START = 0x800;
+constexpr auto EEPROM_MAGIC = 0xDDAADD00;
 
 // Global object
 MPU6050 mpu;
 
+struct dmp_config {
+  int32_t magic;  // are we good?
+  int16_t gyro_offset[3]; // 94, -20, -20
+  int16_t accel_offset[3];
+};
+
+auto active_config = dmp_config {};
 
 void init_dmp() {
   // join I2C bus (I2Cdev library doesn't do this automatically)
@@ -35,10 +46,18 @@ void init_dmp() {
     auto devStatus = mpu.dmpInitialize();
 
     // supply your own gyro offsets here, scaled for min sensitivity
-    mpu.setXGyroOffset(94);
-    mpu.setYGyroOffset(-20);
-    mpu.setZGyroOffset(-20);
-    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+    EEPROM.get(EEPROM_CONFIG_START, active_config);
+    if (!(active_config.magic == EEPROM_MAGIC)) {     
+      memset(&active_config, 0, sizeof(active_config));
+      active_config.magic = EEPROM_MAGIC;      
+    }
+    mpu.setXGyroOffset(active_config.gyro_offset[0]);
+    mpu.setYGyroOffset(active_config.gyro_offset[1]);
+    mpu.setZGyroOffset(active_config.gyro_offset[2]);
+    mpu.setXAccelOffset(active_config.accel_offset[0]);
+    mpu.setYAccelOffset(active_config.accel_offset[0]);
+    mpu.setZAccelOffset(active_config.accel_offset[0]);
+
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
@@ -61,13 +80,26 @@ void init_dmp() {
     }
 }
 
-static auto first_time = false; // todo this in setup
-static auto last_gyro_angle = Eigen::Quaternion<float> { };
-static auto last_end_v = 0.;
+
+void dmp_setOffset(dmp_axis axis, int16_t value) {
+  switch(axis) {
+    case dmp_axis::gyro_x: active_config.gyro_offset[0] = value; mpu.setXGyroOffset(value); break;
+    case dmp_axis::gyro_y: active_config.gyro_offset[1] = value; mpu.setYGyroOffset(value); break;
+    case dmp_axis::gyro_z: active_config.gyro_offset[2] = value; mpu.setZGyroOffset(value); break;
+    case dmp_axis::accel_x: active_config.accel_offset[0] = value; mpu.setXAccelOffset(value); break;
+    case dmp_axis::accel_y: active_config.accel_offset[1] = value; mpu.setYAccelOffset(value); break;
+    case dmp_axis::accel_z: active_config.accel_offset[2] = value; mpu.setZAccelOffset(value); break;       
+  }
+  EEPROM.put(EEPROM_CONFIG_START, active_config);
+}
 
 
 void read_dmp()
 {
+  static auto first_time = false; // todo this in setup
+  static auto last_gyro_angle = Eigen::Quaternion<float> { };
+  static auto last_end_v = 0.;
+
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
       // parse packet in to raw readings, taken from MPU6050 examples
