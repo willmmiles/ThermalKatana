@@ -1,8 +1,15 @@
 #include "config.h"
 
+// Need to be first; some macros in Arduino.h screw this up
+#include <eigen.h>
+#include <Eigen/Geometry>
+
 #include <Arduino.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
+
+
+// Global object
 MPU6050 mpu;
 
 
@@ -28,9 +35,9 @@ void init_dmp() {
     auto devStatus = mpu.dmpInitialize();
 
     // supply your own gyro offsets here, scaled for min sensitivity
-    mpu.setXGyroOffset(220);
-    mpu.setYGyroOffset(76);
-    mpu.setZGyroOffset(-85);
+    mpu.setXGyroOffset(94);
+    mpu.setYGyroOffset(-20);
+    mpu.setZGyroOffset(-20);
     mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
 
     // make sure it worked (returns 0 if so)
@@ -54,25 +61,42 @@ void init_dmp() {
     }
 }
 
+static auto first_time = false; // todo this in setup
+static auto last_gyro_angle = Eigen::Quaternion<float> { };
+static auto last_end_v = 0.;
+
 
 void read_dmp()
 {
-
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
-        // display quaternion values in easy matrix form: w x y z
-        Quaternion q;
-        mpu.dmpGetQuaternion(&q, fifoBuffer);        
-/*
-        Serial.print("quat\t");
-        Serial.print(q.w);
-        Serial.print("\t");
-        Serial.print(q.x);
-        Serial.print("\t");
-        Serial.print(q.y);
-        Serial.print("\t");
-        Serial.println(q.z);
-*/                
+      // parse packet in to raw readings, taken from MPU6050 examples
+      Quaternion q;
+      VectorInt16 aa;         // [x, y, z]            accel sensor measurements
+      VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
+      VectorFloat gravity;    // [x, y, z]            gravity vector
+      mpu.dmpGetQuaternion(&q, fifoBuffer);        
+      mpu.dmpGetAccel(&aa, fifoBuffer);
+      mpu.dmpGetGravity(&gravity, &q);
+      mpu.dmpGetLinearAccel(&aaReal, &aa, &gravity);        
+
+      // Uplift to a more fully-featured math library
+      auto eq = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
+      if (!first_time) {
+        auto angular_distance = eq.angularDistance(last_gyro_angle);
+        // convert to linear distance
+        auto linear_distance = sin(angular_distance / 2) * (2 * 1); // r=~1m
+        auto linear_velocity = linear_distance * 50;  // Hz
+        // derive acceleration
+        auto end_accel = linear_velocity - last_end_v;
+        auto handle_accel = aaReal.getMagnitude();
+
+        Serial.printf("HA: %f   EA: %f\n",handle_accel, end_accel);
+
+      } else {
+        first_time = false;
+      }
+      last_gyro_angle = eq;
   };
     // TODO: I think we want the *difference* between this and prev gyro angles, eg. rotational velocity
     // We can then "charge" the brightness with the rotational velocity used.
