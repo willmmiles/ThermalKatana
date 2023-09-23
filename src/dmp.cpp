@@ -14,7 +14,8 @@ constexpr auto EEPROM_CONFIG_START = 0x100;
 constexpr auto EEPROM_MAGIC = (int32_t) 0xDDAADD00;
 constexpr auto ESTIMATED_G = 9.801;  // m/s^2
 constexpr auto ESTIMATED_G_COUNTS = 8350.;
-
+constexpr auto STARTUP_DELAY = 200U; // samples
+constexpr auto CALIBRATE_SAMPLES = 50U; // samples
 
 struct dmp_config {
   int32_t magic;  // are we good?
@@ -28,28 +29,9 @@ struct dmp_config {
 static MPU6050 mpu;
 static auto active_config = dmp_config {};
 static auto g_vector = Eigen::Vector<float, 3> {};
+static auto sample_count = 0U;
+static auto last_angle = Eigen::Quaternion<float> {};
 
-static void calibrate_g_vector() {
-  // Calibrate our gravity vector
-    auto sum = Eigen::Vector<float,3> {0,0,0};
-    unsigned n_samples = 0;
-    while (n_samples < 50) {
-      uint8_t fifoBuffer[64]; // FIFO storage buffer
-      if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
-          // parse packet in to raw readings, taken from MPU6050 examples
-          Quaternion q;
-          VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-          mpu.dmpGetQuaternion(&q, fifoBuffer);        
-          mpu.dmpGetAccel(&aa, fifoBuffer);
-          auto eq = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
-          auto accel = Eigen::Vector<float, 3> { (float) aa.x, (float) aa.y, (float) aa.z };
-          sum += eq.inverse() * accel;
-          ++n_samples;
-      }
-    }
-    g_vector = sum / n_samples;
-    Serial.printf("G vector: %f, %f, %f\n",g_vector[0],g_vector[1], g_vector[2]);
-}
 
 
 void dmp_set_offset(dmp_axis axis, int16_t value) {
@@ -63,7 +45,8 @@ void dmp_set_offset(dmp_axis axis, int16_t value) {
   }
 
   // Re-run the calibration since we've adjusted the offsets
-  calibrate_g_vector();
+  sample_count = std::min(sample_count, STARTUP_DELAY);
+  g_vector.setZero();
 }
 
 void dmp_save_offset() {
@@ -119,8 +102,8 @@ void init_dmp() {
         // turn on the DMP, now that it's ready
         Serial.println(F("Enabling DMP..."));
         mpu.setDMPEnabled(true);
-        
-        calibrate_g_vector();
+        sample_count = 0;
+        g_vector.setZero();
     } else {
         // ERROR!
         // 1 = initial memory load failed
@@ -136,8 +119,6 @@ void init_dmp() {
 
 Eigen::Vector2f read_dmp()
 {
-  static auto first_time = false; // todo this in setup
-  static auto last_angle = Eigen::Quaternion<float> {};
   Eigen::Vector2f result = {0., 0.};
 
   uint8_t fifoBuffer[64]; // FIFO storage buffer
@@ -152,25 +133,40 @@ Eigen::Vector2f read_dmp()
       auto eq = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
       auto accel = Eigen::Vector3f { Eigen::Map<Eigen::Vector<int16_t, 3>>(&aa.x).cast<float>() };
 
-      if (!first_time) {
+      if (sample_count > (STARTUP_DELAY+CALIBRATE_SAMPLES)) {
         auto delta_angle = eq.angularDistance(last_angle);
         
-        Serial.printf("%f, %f, %f -- ",accel[0], accel[1], accel[2]);
+        //Serial.printf("%f, %f, %f -- ",accel[0], accel[1], accel[2]);
         // Subtract gravity vector
-        accel -= (eq.inverse() * g_vector);
-        Serial.printf("%f, %f, %f\n",accel[0], accel[1], accel[2]);
+        accel = (eq * accel) - g_vector;
+        //Serial.printf("%f, %f, %f\n",accel[0], accel[1], accel[2]);
 
         auto handle_accel = accel.norm();
 
         // good, good!
-        Serial.printf("%f, %f\n",handle_accel, delta_angle);
-        
-        // dump raw accel data for calibration
-        //Serial.printf("%d, %d, %d, %d, %d, %d\n", aa.x, aa.y, aa.z, aaRaw.x, aaRaw.y, aaRaw.z);
+        // Serial.printf("%f, %f\n",handle_accel, delta_angle);        
         result = Eigen::Vector2f { handle_accel, delta_angle };
       } else {
-        first_time = false;
+        // DEBUG!        
+/*
+        Eigen::Vector3f g_x = eq * accel;
+        Serial.printf("%d [%f, %f, %f, %f] -- %f, %f, %f -- %f, %f, %f\n",
+          sample_count,
+          eq.w(), eq.x(), eq.y(), eq.z(),
+          accel[0], accel[1], accel[2],
+          g_x[0], g_x[1], g_x[2]
+          );
+*/        
+        if (sample_count >= STARTUP_DELAY) {
+          g_vector += eq * accel;
+          if (sample_count == (STARTUP_DELAY + CALIBRATE_SAMPLES)) {
+            g_vector /= CALIBRATE_SAMPLES;  // all done!
+            Serial.printf("G vector: %f, %f, %f\n",g_vector[0],g_vector[1], g_vector[2]);          
+          }
+        }
+        ++sample_count;
       }
+
       last_angle = eq;
   };
 
