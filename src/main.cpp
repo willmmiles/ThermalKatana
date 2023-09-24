@@ -33,6 +33,12 @@ BlynkTimer sim_timer;
 std::array<CRGB,NUM_LEDS> leds;
 typedef Eigen::Array<uint16_t, NUM_LEDS, 1> brightness_array_t;
 
+float acc_sensitivity = 200.;
+float gyro_sensitivity = 0.01;
+int fwd_color_scale = 100;
+int back_color_scale = -50;
+
+
 // Enum index to ap
 const std::array<decltype(HeatColors_p)*, 7> palette_map = {
   &HeatColors_p,
@@ -68,6 +74,13 @@ BLYNK_WRITE(V5)
   int value = param.asInt();
   FastLED.setBrightness(value);
 }
+
+BLYNK_WRITE(V6) { acc_sensitivity = param.asFloat(); };
+BLYNK_WRITE(V7) { gyro_sensitivity = param.asFloat(); };
+
+BLYNK_WRITE(V10) { fwd_color_scale = param.asInt(); };
+BLYNK_WRITE(V11) { back_color_scale = param.asInt(); };
+
 
 
 BLYNK_WRITE(V50) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); };  
@@ -105,7 +118,7 @@ void wave(led_value_t& values) {
   start_index = (start_index + 1) % NUM_LEDS;
 }
 
-void energy_forward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy) {
+void energy_forward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy, uint16_t color_scale) {
   static brightness_array_t state;
   static size_t index = 0;
 
@@ -113,12 +126,12 @@ void energy_forward(led_value_t& values, brightness_array_t& brightness, uint8_t
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
     brightness[led_index] += state[state_index];
-    values[led_index] += 50*state[state_index];
+    values[led_index] += state[state_index] * color_scale;
   }
   if (index) { --index; } else { index = NUM_LEDS - 1; };
 };
 
-void energy_backward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy) {
+void energy_backward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy, uint16_t color_scale) {
   static brightness_array_t state;
   static size_t index = NUM_LEDS - 1;
 
@@ -126,7 +139,7 @@ void energy_backward(led_value_t& values, brightness_array_t& brightness, uint8_
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
     brightness[led_index] += state[state_index];
-    values[led_index] += 50*state[state_index];
+    values[led_index] += state[state_index] * color_scale;
   }
   if (index == NUM_LEDS) { index = 0; } else { ++index; };
 };
@@ -142,8 +155,8 @@ void sim_timer_event()
     sparkle(led_brightness);
     //wave(led_values);
 
-    energy_forward(led_values, led_brightness, accel_values[0] / 200);
-    //energy_backward(led_values, led_brightness, accel_values[0] / 200);
+    energy_forward(led_values, led_brightness, accel_values[0] / acc_sensitivity, fwd_color_scale);
+    energy_backward(led_values, led_brightness, fabs(accel_values[1]) / gyro_sensitivity, back_color_scale);
 
     for(auto i = 0U; i < NUM_LEDS; ++i) {
       //leds[i] = HeatColor(led_values[i]);
