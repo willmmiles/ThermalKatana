@@ -136,7 +136,9 @@ Eigen::Vector2f read_dmp()
       if (sample_count > (STARTUP_DELAY+CALIBRATE_SAMPLES)) {
         auto delta_angle = eq.angularDistance(last_angle);
         
-        //Serial.printf("%f, %f, %f -- ",accel[0], accel[1], accel[2]);
+        // uncomment for calibration
+        // TODO: send this back to Blynk?
+        //Serial.printf("[%f, %f, %f]\n",accel[0], accel[1], accel[2]);
         // Subtract gravity vector
         accel = (eq * accel) - g_vector;
         //Serial.printf("%f, %f, %f\n",accel[0], accel[1], accel[2]);

@@ -34,7 +34,7 @@ std::array<CRGB,NUM_LEDS> leds;
 typedef Eigen::Array<uint16_t, NUM_LEDS, 1> brightness_array_t;
 
 float acc_sensitivity = 200.;
-float gyro_sensitivity = 0.01;
+float gyro_sensitivity = 0.001;
 int fwd_color_scale = 100;
 int back_color_scale = -50;
 
@@ -49,7 +49,7 @@ const std::array<decltype(HeatColors_p)*, 7> palette_map = {
   &OceanColors_p,
   &ForestColors_p
 };
-decltype(HeatColors_p)* active_palette = palette_map[0];
+decltype(HeatColors_p)* active_palette = palette_map[1];
 
 // This function is called every time the Virtual Pin 0 state changes
 BLYNK_WRITE(V0)

@@ -8,7 +8,7 @@ auto KI = 0.0;  // controller parameters
 auto KD = 0.1;
 constexpr auto dT = 0.1;  // "delta-T"
 constexpr auto CONTROL_MAX = 500; // degrees per tick
-auto TARGET = 5000;  // target temperature
+auto TARGET = 9000;  // target temperature
 
 typedef Eigen::Array<int,NUM_LEDS,1> temperature_array_t;
 temperature_array_t temperature = temperature_array_t::Constant(AMBIENT);
