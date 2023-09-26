@@ -118,11 +118,13 @@ void wave(led_value_t& values) {
   start_index = (start_index + 1) % NUM_LEDS;
 }
 
-void energy_forward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy, uint16_t color_scale) {
+void energy_forward(led_value_t& values, brightness_array_t& brightness, float new_energy, uint16_t color_scale) {
   static brightness_array_t state;
   static size_t index = 0;
+  if (new_energy < 0.) new_energy = 0;
+  if (new_energy > 120) new_energy = 120;
 
-  state[index] = new_energy;
+  state[index] = (uint16_t) new_energy;
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
     brightness[led_index] += state[state_index];
@@ -131,11 +133,13 @@ void energy_forward(led_value_t& values, brightness_array_t& brightness, uint8_t
   if (index) { --index; } else { index = NUM_LEDS - 1; };
 };
 
-void energy_backward(led_value_t& values, brightness_array_t& brightness, uint8_t new_energy, uint16_t color_scale) {
+void energy_backward(led_value_t& values, brightness_array_t& brightness, float new_energy, uint16_t color_scale) {
   static brightness_array_t state;
   static size_t index = NUM_LEDS - 1;
+  if (new_energy < 0.) new_energy = 0;
+  if (new_energy > 120) new_energy = 120;
 
-  state[index] = new_energy;
+  state[index] = (uint16_t) new_energy;
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
     brightness[led_index] += state[state_index];
@@ -155,12 +159,12 @@ void sim_timer_event()
     sparkle(led_brightness);
     //wave(led_values);
 
-    energy_forward(led_values, led_brightness, accel_values[0] / acc_sensitivity, fwd_color_scale);
-    energy_backward(led_values, led_brightness, fabs(accel_values[1]) / gyro_sensitivity, back_color_scale);
+    //energy_forward(led_values, led_brightness, accel_values[0] / acc_sensitivity, fwd_color_scale);
+    energy_forward(led_values, led_brightness, fabs(accel_values[1]) / gyro_sensitivity, fwd_color_scale);
 
     for(auto i = 0U; i < NUM_LEDS; ++i) {
       //leds[i] = HeatColor(led_values[i]);
-      leds[i] = ColorFromPalette(*active_palette, (led_values[i] / 40) % 256, led_brightness[i]);
+      leds[i] = ColorFromPalette(*active_palette, (led_values[i] / 40) % 256, min(led_brightness[i], (uint16_t) 255));
     }
     FastLED.show();
 }
