@@ -50,7 +50,7 @@ temperature_array_t cool(const temperature_array_t &input, int ambient) {
   auto n_pixels = random(6);
   for (int i = 0; i < pixel_count[n_pixels]; i++) {
     auto j = random(NUM_LEDS);
-    output[j] -= (random(-20,50) * (input[j] - ambient)) / 100;  // lose between 40 and 60% of the value randomly
+    output[j] -= (random(-5,30) * (input[j] - ambient)) / 100;  // lose between 20 and 50% of the value randomly
     output[j] = max(output[j], ambient - input[j]);  // don't cool below ambient
   }
   return output;
@@ -72,7 +72,7 @@ led_value_t simulate_temperature() {
   //Serial.print("Smoothing: ");
   //print_array(temperature_change);
   // Second, "cool" the temperatures using a stochastic model.  This produces a "flickery flame" effect.
-  // temperature_change += cool(temperature, AMBIENT);
+  temperature_change += cool(temperature, AMBIENT);
   // Third, apply a PID controller to each cell in the model - this simulates the "real" controlled heat effect.
   temperature_change += control(temperature, KI, KD, TARGET, integral);
 
