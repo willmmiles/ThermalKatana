@@ -152,17 +152,21 @@ Eigen::Vector3f read_dmp()
 
         auto tip_position = orientation_abs * Eigen::Vector3f { ESTIMATED_G_COUNTS / ESTIMATED_G, 0, 0 }; // 1 "m"
         Eigen::Vector3f delta_pos = (tip_position - last_position) * 50; // m / s
-        Eigen::Vector3f tip_acc = (delta_pos - last_delta_pos) * 50; // m / s^s
-        Eigen::Vector3f end_accel = tip_acc + accel_abs;
+        //Eigen::Vector3f tip_acc = (delta_pos - last_delta_pos) * 50; // m / s^s
+        //Eigen::Vector3f end_accel = tip_acc + accel_abs;
         last_delta_pos = delta_pos;
         last_position = tip_position;
 
-        Serial.printf("[%f, %f, %f] ",accel_abs[0], accel_abs[1], accel_abs[2]);
-        Serial.printf("[%f, %f, %f] ",delta_pos[0], delta_pos[1], delta_pos[2]);
-        Serial.printf("[%f, %f, %f]\n",tip_acc[0], tip_acc[1], tip_acc[2]);
+        //Serial.printf("[%f, %f, %f] ",accel_abs[0], accel_abs[1], accel_abs[2]);
+        //Serial.printf("[%f, %f, %f]\n",delta_pos[0], delta_pos[1], delta_pos[2]);
+        //Serial.printf("[%f, %f, %f]\n",tip_acc[0], tip_acc[1], tip_acc[2]);
 
-        // good, good!
-        result = Eigen::Vector3f { accel_abs.norm(), end_accel.norm(), delta_angle };
+        // Apply a filter to the handle acceleration
+        // This is effectively a high pass filter
+        static auto accel_return = 0.;
+        accel_return = (0.2 * accel_return) + (0.8 * accel_abs.norm());
+
+        result = Eigen::Vector3f { accel_return, delta_pos.norm(), delta_angle };
       } else {
         // DEBUG!        
         Serial.printf("%d [%f, %f, %f, %f] -- %f, %f, %f -- %f, %f, %f\n",
