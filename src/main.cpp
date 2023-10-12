@@ -149,11 +149,11 @@ void energy_backward(led_value_t& values, brightness_array_t& brightness, float 
 };
 
 void surge(brightness_array_t& brightness, float amount) {
-  static brightness_array_t state;
+  static double state;
   if (amount < 0.) amount = 0;
   if (amount > 120) amount = 120;
 
-  state = (state/2) + static_cast<uint16_t>(amount);
+  state = (state/2) + amount;
   brightness += state;
 };
 
