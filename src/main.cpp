@@ -148,19 +148,31 @@ void energy_backward(led_value_t& values, brightness_array_t& brightness, float 
   if (index == NUM_LEDS) { index = 0; } else { ++index; };
 };
 
+void surge(brightness_array_t& brightness, float amount) {
+  static brightness_array_t state;
+  if (amount < 0.) amount = 0;
+  if (amount > 120) amount = 120;
+
+  state = (state/2) + static_cast<uint16_t>(amount);
+  brightness += state;
+};
+
 // This function sends Arduino's uptime every second to Virtual Pin 2.
 void sim_timer_event()
 {
     auto accel_values = read_dmp();
     auto led_values = simulate_temperature();
-    auto led_brightness = brightness_array_t { brightness_array_t::Constant(128) };
+    auto led_brightness = brightness_array_t { brightness_array_t::Constant(32) };
+
+    Serial.printf("[%d] %f, %f, %f\n", millis(), accel_values[0], accel_values[1], accel_values[2]);
 
     // Apply effects
     sparkle(led_brightness);
     //wave(led_values);
 
     //energy_forward(led_values, led_brightness, accel_values[0] / acc_sensitivity, fwd_color_scale);
-    energy_forward(led_values, led_brightness, fabs(accel_values[1]) / gyro_sensitivity, fwd_color_scale);
+    //energy_forward(led_values, led_brightness, fabs(accel_values[2]) / gyro_sensitivity, fwd_color_scale);
+    surge(led_brightness, accel_values[1] / acc_sensitivity);
 
     for(auto i = 0U; i < NUM_LEDS; ++i) {
       //leds[i] = HeatColor(led_values[i]);

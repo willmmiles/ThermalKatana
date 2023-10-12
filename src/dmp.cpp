@@ -30,8 +30,10 @@ static MPU6050 mpu;
 static auto active_config = dmp_config {};
 static auto g_vector = Eigen::Vector<float, 3> {};
 static auto sample_count = 0U;
-static auto last_angle = Eigen::Quaternion<float> {};
-
+// Motion calculation static variables
+static auto last_orientation_abs = Eigen::Quaternion<float> {};
+static auto last_position = Eigen::Vector3f { 0, 0, 0 };
+static auto last_delta_pos = Eigen::Vector3f { 0, 0 ,0 };
 
 
 void dmp_set_offset(dmp_axis axis, int16_t value) {
@@ -82,6 +84,9 @@ void init_dmp() {
       memset(&active_config, 0, sizeof(active_config));
       active_config.magic = EEPROM_MAGIC;
       // Default to the "factory trim" values
+      active_config.gyro_offset[0]= mpu.getGyroXSelfTestFactoryTrim();
+      active_config.gyro_offset[1]= mpu.getGyroYSelfTestFactoryTrim();
+      active_config.gyro_offset[2]= mpu.getGyroZSelfTestFactoryTrim();
       active_config.accel_offset[0] = mpu.getAccelXSelfTestFactoryTrim();
       active_config.accel_offset[1] = mpu.getAccelYSelfTestFactoryTrim();
       active_config.accel_offset[2] = mpu.getAccelZSelfTestFactoryTrim();
@@ -93,7 +98,8 @@ void init_dmp() {
     mpu.setYAccelOffset(active_config.accel_offset[1]);
     mpu.setZAccelOffset(active_config.accel_offset[2]);
 
-    //Serial.printf("Factory trim: %d, %d ,%d\n",mpu.getAccelXSelfTestFactoryTrim(),mpu.getAccelYSelfTestFactoryTrim(),mpu.getAccelZSelfTestFactoryTrim());
+    Serial.printf("Factory trim Gyro: %d, %d ,%d\n",mpu.getGyroXSelfTestFactoryTrim(),mpu.getGyroYSelfTestFactoryTrim(),mpu.getGyroZSelfTestFactoryTrim());
+    Serial.printf("Factory trim Accel: %d, %d ,%d\n",mpu.getAccelXSelfTestFactoryTrim(),mpu.getAccelYSelfTestFactoryTrim(),mpu.getAccelZSelfTestFactoryTrim());
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
@@ -117,9 +123,9 @@ void init_dmp() {
 
 
 
-Eigen::Vector2f read_dmp()
+Eigen::Vector3f read_dmp()
 {
-  Eigen::Vector2f result = {0., 0.};
+  Eigen::Vector3f result = {0., 0., 0.};
 
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
@@ -130,37 +136,43 @@ Eigen::Vector2f read_dmp()
       mpu.dmpGetAccel(&aa, fifoBuffer);
 
       // Uplift to a more fully-featured math library
-      auto eq = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
-      auto accel = Eigen::Vector3f { Eigen::Map<Eigen::Vector<int16_t, 3>>(&aa.x).cast<float>() };
+      auto orientation_abs = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
+      auto accel_rel = Eigen::Map<Eigen::Vector<int16_t, 3>>(&aa.x).cast<float>();
+      auto accel_abs = Eigen::Vector3f { orientation_abs * accel_rel };
+
+      // uncomment for calibration
+      // TODO: send this back to Blynk?
+      // Serial.printf("[%f, %f, %f]\n",accel_rel[0], accel_rel[1], accel_rel[2]);
 
       if (sample_count > (STARTUP_DELAY+CALIBRATE_SAMPLES)) {
-        auto delta_angle = eq.angularDistance(last_angle);
+        auto delta_angle = orientation_abs.angularDistance(last_orientation_abs);
         
-        // uncomment for calibration
-        // TODO: send this back to Blynk?
-        //Serial.printf("[%f, %f, %f]\n",accel[0], accel[1], accel[2]);
         // Subtract gravity vector
-        accel = (eq * accel) - g_vector;
-        //Serial.printf("%f, %f, %f\n",accel[0], accel[1], accel[2]);
+        accel_abs -= g_vector; 
 
-        auto handle_accel = accel.norm();
+        auto tip_position = orientation_abs * Eigen::Vector3f { ESTIMATED_G_COUNTS / ESTIMATED_G, 0, 0 }; // 1 "m"
+        Eigen::Vector3f delta_pos = (tip_position - last_position) * 50; // m / s
+        Eigen::Vector3f tip_acc = (delta_pos - last_delta_pos) * 50; // m / s^s
+        Eigen::Vector3f end_accel = tip_acc + accel_abs;
+        last_delta_pos = delta_pos;
+        last_position = tip_position;
+
+        Serial.printf("[%f, %f, %f] ",accel_abs[0], accel_abs[1], accel_abs[2]);
+        Serial.printf("[%f, %f, %f] ",delta_pos[0], delta_pos[1], delta_pos[2]);
+        Serial.printf("[%f, %f, %f]\n",tip_acc[0], tip_acc[1], tip_acc[2]);
 
         // good, good!
-        // Serial.printf("%f, %f\n",handle_accel, delta_angle);        
-        result = Eigen::Vector2f { handle_accel, delta_angle };
+        result = Eigen::Vector3f { accel_abs.norm(), end_accel.norm(), delta_angle };
       } else {
         // DEBUG!        
-/*
-        Eigen::Vector3f g_x = eq * accel;
         Serial.printf("%d [%f, %f, %f, %f] -- %f, %f, %f -- %f, %f, %f\n",
           sample_count,
-          eq.w(), eq.x(), eq.y(), eq.z(),
-          accel[0], accel[1], accel[2],
-          g_x[0], g_x[1], g_x[2]
+          orientation_abs.w(), orientation_abs.x(), orientation_abs.y(), orientation_abs.z(),
+          accel_rel[0], accel_rel[1], accel_rel[2],
+          accel_abs[0], accel_abs[1], accel_abs[2]
           );
-*/        
         if (sample_count >= STARTUP_DELAY) {
-          g_vector += eq * accel;
+          g_vector += accel_abs;
           if (sample_count == (STARTUP_DELAY + CALIBRATE_SAMPLES)) {
             g_vector /= CALIBRATE_SAMPLES;  // all done!
             Serial.printf("G vector: %f, %f, %f\n",g_vector[0],g_vector[1], g_vector[2]);          
@@ -169,7 +181,8 @@ Eigen::Vector2f read_dmp()
         ++sample_count;
       }
 
-      last_angle = eq;
+      last_orientation_abs = orientation_abs;
+      
   };
 
   return result;

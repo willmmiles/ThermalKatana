@@ -19,4 +19,4 @@ void init_dmp();
 void dmp_set_offset(dmp_axis, int16_t value);
 void dmp_save_offset();
 
-Eigen::Vector2f read_dmp();
+Eigen::Vector3f read_dmp();
