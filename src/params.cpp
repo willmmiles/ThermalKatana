@@ -30,6 +30,8 @@ params_t params = {
     .gyro_sensitivity = 0.001,
     .fwd_color_scale = 100,
     .back_color_scale = -50,
+    .surge_falloff = 0.9,
+    .surge_sensitivity = 20
 };
 
 // Methods

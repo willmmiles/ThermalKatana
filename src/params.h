@@ -20,6 +20,8 @@ struct params_t {
   float gyro_sensitivity;
   int32_t fwd_color_scale;
   int32_t back_color_scale;
+  float surge_falloff;
+  float surge_sensitivity;
 };
 #pragma pack(pop)
 

@@ -74,9 +74,11 @@ BLYNK_WRITE(V5)
 
 BLYNK_WRITE(V6) { params.acc_sensitivity = param.asFloat(); };
 BLYNK_WRITE(V7) {  params.gyro_sensitivity = param.asFloat(); };
+BLYNK_WRITE(V8) {  params.surge_sensitivity  = param.asFloat(); };
 
 BLYNK_WRITE(V10) {  params.fwd_color_scale = param.asInt(); };
 BLYNK_WRITE(V11) {  params.back_color_scale = param.asInt(); };
+BLYNK_WRITE(V12) {  params.surge_falloff  = param.asFloat(); };
 
 
 
@@ -150,7 +152,7 @@ void surge(brightness_array_t& brightness, float amount) {
   if (amount < 0.) amount = 0;
   if (amount > 120) amount = 120;
 
-  state = (state/2) + amount;
+  state = (state * params.surge_falloff) + (amount / params.surge_sensitivity);
   brightness += state;
 };
 
@@ -169,7 +171,7 @@ void sim_timer_event()
 
     energy_forward(led_values, led_brightness, accel_values[0] / params.acc_sensitivity,  params.fwd_color_scale);
     //energy_forward(led_values, led_brightness, fabs(accel_values[2]) /  params.gyro_sensitivity,  params.fwd_color_scale);
-    surge(led_brightness, accel_values[1] /  params.acc_sensitivity);
+    surge(led_brightness, accel_values[1]);
 
     for(auto i = 0U; i < NUM_LEDS; ++i) {
       //leds[i] = HeatColor(led_values[i]);
