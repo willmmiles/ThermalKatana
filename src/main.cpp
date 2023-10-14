@@ -66,11 +66,15 @@ BLYNK_WRITE(V3)
   }
 }
 
+BLYNK_WRITE(V4) { params.base_brightness = param.asInt(); };
+
 BLYNK_WRITE(V5)
 {
   params.max_brightness = param.asInt();
   FastLED.setBrightness(params.max_brightness);
 }
+
+
 
 BLYNK_WRITE(V6) { params.acc_sensitivity = param.asFloat(); };
 BLYNK_WRITE(V7) {  params.gyro_sensitivity = param.asFloat(); };
