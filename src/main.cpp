@@ -122,7 +122,7 @@ void wave(led_value_t& values) {
 }
 
 void energy_forward(led_value_t& values, brightness_array_t& brightness, float new_energy, uint16_t color_scale) {
-  static brightness_array_t state;
+  static brightness_array_t state = brightness_array_t::Zero();
   static size_t index = 0;
   if (new_energy < 0.) new_energy = 0;
   if (new_energy > 120) new_energy = 120;
@@ -130,14 +130,14 @@ void energy_forward(led_value_t& values, brightness_array_t& brightness, float n
   state[index] = (uint16_t) new_energy;
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
-    brightness[led_index] += state[state_index];
+    // brightness[led_index] += state[state_index];
     values[led_index] += state[state_index] * color_scale;
   }
   if (index) { --index; } else { index = NUM_LEDS - 1; };
 };
 
 void energy_backward(led_value_t& values, brightness_array_t& brightness, float new_energy, uint16_t color_scale) {
-  static brightness_array_t state;
+  static brightness_array_t state = brightness_array_t::Zero();
   static size_t index = NUM_LEDS - 1;
   if (new_energy < 0.) new_energy = 0;
   if (new_energy > 120) new_energy = 120;
@@ -145,19 +145,19 @@ void energy_backward(led_value_t& values, brightness_array_t& brightness, float 
   state[index] = (uint16_t) new_energy;
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
-    brightness[led_index] += state[state_index];
+    //brightness[led_index] += state[state_index];
     values[led_index] += state[state_index] * color_scale;
   }
   if (index == NUM_LEDS) { index = 0; } else { ++index; };
 };
 
 void surge(brightness_array_t& brightness, float amount) {
-  static double state;
+  static double state = 0.;
+  amount *= params.surge_sensitivity;
   if (amount < 0.) amount = 0;
   if (amount > 120) amount = 120;
-
-  state = (state * params.surge_falloff) + (amount / params.surge_sensitivity);
-  brightness += state;
+  state = (state * params.surge_falloff) + amount;
+  brightness += std::min(state,255.);
 };
 
 // This function sends Arduino's uptime every second to Virtual Pin 2.
