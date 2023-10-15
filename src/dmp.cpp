@@ -20,6 +20,12 @@ constexpr auto CALIBRATE_SAMPLES = 50U; // samples
 
 // Global objects
 static MPU6050 mpu;
+// Calibration state
+// We keep this in memory as we can't get it back from the DPU if it fails to initialize.
+int16_t active_gyro_offset[3];
+int16_t active_accel_offset[3];
+
+// G analysis
 static auto g_vector = Eigen::Vector<float, 3> {};
 static auto sample_count = 0U;
 // Motion calculation static variables
@@ -30,17 +36,30 @@ static auto last_delta_pos = Eigen::Vector3f { 0, 0 ,0 };
 
 void dmp_set_offset(dmp_axis axis, int16_t value) {
   switch(axis) {
-    case dmp_axis::gyro_x: mpu.setXGyroOffset(value); break;
-    case dmp_axis::gyro_y: mpu.setYGyroOffset(value); break;
-    case dmp_axis::gyro_z: mpu.setZGyroOffset(value); break;
-    case dmp_axis::accel_x: mpu.setXAccelOffset(value); break;
-    case dmp_axis::accel_y: mpu.setYAccelOffset(value); break;
-    case dmp_axis::accel_z: mpu.setZAccelOffset(value); break;       
+    case dmp_axis::gyro_x: active_gyro_offset[0] = value; mpu.setXGyroOffset(value); break;
+    case dmp_axis::gyro_y: active_gyro_offset[1] = value; mpu.setYGyroOffset(value); break;
+    case dmp_axis::gyro_z: active_gyro_offset[2] = value; mpu.setZGyroOffset(value); break;
+    case dmp_axis::accel_x: active_accel_offset[0] = value; mpu.setXAccelOffset(value); break;
+    case dmp_axis::accel_y: active_accel_offset[1] = value; mpu.setYAccelOffset(value); break;
+    case dmp_axis::accel_z: active_accel_offset[2] = value; mpu.setZAccelOffset(value); break;       
   }
 
   // Re-run the calibration since we've adjusted the offsets
   sample_count = std::min(sample_count, STARTUP_DELAY);
   g_vector.setZero();
+}
+
+
+int16_t dmp_get_offset(dmp_axis axis) {
+  switch(axis) {
+    case dmp_axis::gyro_x: return active_gyro_offset[0];
+    case dmp_axis::gyro_y: return active_gyro_offset[1];
+    case dmp_axis::gyro_z: return active_gyro_offset[2];
+    case dmp_axis::accel_x: return active_accel_offset[0];
+    case dmp_axis::accel_y: return active_accel_offset[1];
+    case dmp_axis::accel_z: return active_accel_offset[2];
+  }
+  return 0; // ?
 }
 
 // utility
@@ -76,6 +95,9 @@ void init_dmp(int16_t gyro_offset[3], int16_t accel_offset[3]) {
     set_default(accel_offset[0], mpu.getAccelXSelfTestFactoryTrim());
     set_default(accel_offset[1], mpu.getAccelYSelfTestFactoryTrim());
     set_default(accel_offset[2], mpu.getAccelZSelfTestFactoryTrim());
+
+    memcpy(active_gyro_offset, gyro_offset, sizeof(active_gyro_offset));
+    memcpy(active_accel_offset, accel_offset, sizeof(accel_offset));
 
     mpu.setXGyroOffset(gyro_offset[0]);
     mpu.setYGyroOffset(gyro_offset[1]);

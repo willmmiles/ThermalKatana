@@ -11,8 +11,8 @@
 /* Fill-in information from Blynk Device Info here */
 #define BLYNK_TEMPLATE_ID "TMPL2GI5SaWlg"
 #define BLYNK_TEMPLATE_NAME "Thermal Katana"
-//#define BLYNK_AUTH_TOKEN "dj4ewPU05Ra1Du9kHgQP_eOpjyPKVYk7"
-
+#define BLYNK_SSL_TX_BUF_SIZE 1024
+#define BLYNK_MSG_LIMIT 0
 #define BLYNK_FIRMWARE_VERSION        "0.5.0"
 
 /* Comment this out to disable prints and save space */
@@ -45,7 +45,6 @@ const std::array<decltype(HeatColors_p)*, 7> palette_map = {
   &ForestColors_p
 };
 decltype(HeatColors_p)* active_palette = palette_map[1];
-
 
 void delayed_eeprom_write() {
   constexpr auto EEPROM_DELAY = 10 * 1000;  // 10s
@@ -111,33 +110,43 @@ static void apply_params() {
   set_ki(params.blade_ki);
   active_palette = palette_map[params.palette];
   FastLED.setBrightness(params.max_brightness);
+
+  // We don't load the gyro parameters - restore them from the device
   for (auto i = 0; i < 3; ++i) {
-    dmp_set_offset(static_cast<dmp_axis>(i), params.gyro_offset[i]);
-    dmp_set_offset(static_cast<dmp_axis>(i+3), params.accel_offset[i]);
+    params.gyro_offset[i] = dmp_get_offset(static_cast<dmp_axis>(i));
+    params.accel_offset[i] = dmp_get_offset(static_cast<dmp_axis>(i+3));
   }
 
-  // Also tell Blynk
-  if (Blynk.connected()) {
-    Blynk.beginGroup();
-    Blynk.virtualWrite(V0, params.target_temperature);
-    Blynk.virtualWrite(V1, params.blade_kd);
-    Blynk.virtualWrite(V2, params.blade_ki);
-    Blynk.virtualWrite(V3, params.palette);
-    Blynk.virtualWrite(V4, params.base_brightness);
-    Blynk.virtualWrite(V5, params.max_brightness);
-    Blynk.virtualWrite(V6, params.acc_sensitivity);
-    Blynk.virtualWrite(V7, params.gyro_sensitivity);
-    Blynk.virtualWrite(V8, params.surge_sensitivity);
-    Blynk.virtualWrite(V10, params.fwd_color_scale);
-    Blynk.virtualWrite(V11, params.back_color_scale);
-    Blynk.virtualWrite(V12, params.surge_falloff);
-    for (auto i = 0; i < 3; ++i) {
-      Blynk.virtualWrite(50+i, params.gyro_offset[i]);
-      Blynk.virtualWrite(53+i, params.accel_offset[i]);
-    }
-    Blynk.endGroup();
+  // Notify Blynk of our newly-loaded values
+  static auto timer_handle =  BlynkTimer::Handle {};
+  if (timer_handle.isValid()) {
+    timer_handle.deleteTimer();
   }
+  auto update_pin = 0U;
+  timer_handle = timer_core.setTimer(100, [=]() mutable {
+    Serial.printf("[%ld] Updating %d\n", millis(), update_pin);
+    switch(update_pin) {
+      case 0: Blynk.virtualWrite(V0, params.target_temperature); break;
+      case 1: Blynk.virtualWrite(V1, params.blade_kd); break;
+      case 2: Blynk.virtualWrite(V2, params.blade_ki); break;
+      case 3: Blynk.virtualWrite(V3, params.palette); break;
+      case 4: Blynk.virtualWrite(V4, params.base_brightness); break;
+      case 5: Blynk.virtualWrite(V5, params.max_brightness); break;
+      case 6: Blynk.virtualWrite(V6, params.acc_sensitivity); break;
+      case 7: Blynk.virtualWrite(V7, params.gyro_sensitivity); break;
+      case 8: Blynk.virtualWrite(V8, params.surge_sensitivity); break;
+      case 9: Blynk.virtualWrite(V10, params.fwd_color_scale); break;
+      case 10: Blynk.virtualWrite(V11, params.back_color_scale); break;
+      case 11: Blynk.virtualWrite(V12, params.surge_falloff); break;
+      default:
+        // nope
+        ;
+    }
+    Serial.printf("[%ld] Updated %d\n", millis(), update_pin);
+    ++update_pin;    
+  }, 12) ;
 }
+
 
 
 BLYNK_WRITE_DEFAULT() {
