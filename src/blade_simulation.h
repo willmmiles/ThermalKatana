@@ -8,6 +8,8 @@
 void set_target_temperature(int degrees_k);
 void set_kd(float kd);
 void set_ki(float ki);
+void set_cool_min(float);
+void set_cool_max(float);
 
 // LED values are returned between 0 and 16384
 // These values can be converted to "temperature" values via FastLED::HeatColor

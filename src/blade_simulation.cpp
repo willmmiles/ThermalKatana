@@ -6,8 +6,9 @@
 constexpr auto AMBIENT = 295;
 auto KI = 0.0;  // controller parameters
 auto KD = 0.1;
+auto cool_min = 0.1;
+auto cool_max = 5.0;
 constexpr auto dT = 0.1;  // "delta-T"
-constexpr auto CONTROL_MAX = 500; // degrees per tick
 auto TARGET = 9000;  // target temperature
 
 typedef Eigen::Array<int,NUM_LEDS,1> temperature_array_t;
@@ -47,9 +48,10 @@ temperature_array_t cool(const temperature_array_t &input, int ambient) {
   // TODO: do we need to return the whole array?
   temperature_array_t output = temperature_array_t::Zero();;
   //constexpr int pixel_count[] = { 0, 0, 1, 1, 1, 1, 1, 1, 2, 2 };
-  auto n_pixels = random(6);
+  //auto n_pixels = random(6);
   for (int j = 0; j < NUM_LEDS; j++) {
-    output[j] -= (random(2,15) * (input[j] - ambient)) / 100;  // lose between 2 and 10% of the value randomly
+    auto cool_fraction = (cool_min + ((cool_max - cool_min) * static_cast<unsigned long>(random())) / 4294967296.) / 100;
+    output[j] -= cool_fraction * (input[j] - ambient);
     output[j] = max(output[j], ambient - input[j]);  // don't cool below ambient
   }
   return output;
@@ -59,7 +61,7 @@ temperature_array_t cool(const temperature_array_t &input, int ambient) {
 temperature_array_t control(const temperature_array_t &input, float ki, float kd, int target, Eigen::Array<float,NUM_LEDS,1>& integral) {
     auto error = Eigen::Array<float,NUM_LEDS,1> { (target - input).cast<float>() };
     integral += error * dT;
-    return ((kd * error) + (ki * integral)).cast<int>().cwiseMax(0); //.cwiseMin(CONTROL_MAX);
+    return ((kd * error) + (ki * integral)).cast<int>().cwiseMax(0);
 }
 
 
@@ -87,4 +89,5 @@ led_value_t simulate_temperature() {
 void set_target_temperature(int degrees_k) { TARGET = degrees_k; }
 void set_kd(float kd) { KD = kd; };
 void set_ki(float ki) { KI = ki; };
-  
+void set_cool_min(float v) { cool_min = v; };
+void set_cool_max(float v) { cool_max = v; };

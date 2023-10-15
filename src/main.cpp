@@ -53,6 +53,7 @@ void delayed_eeprom_write() {
     timer_handle.restartTimer();
   } else {
     timer_handle = timer_core.setTimeout(EEPROM_DELAY, [&](){
+      Serial.printf("[%ld] Saving state\n", millis());
       save_params(0);
       // invalidate handle
       timer_handle = BlynkTimer::Handle {}; 
@@ -102,12 +103,17 @@ BLYNK_WRITE(V10) {  params.fwd_color_scale = param.asInt(); delayed_eeprom_write
 BLYNK_WRITE(V11) {  params.back_color_scale = param.asInt(); delayed_eeprom_write(); };
 BLYNK_WRITE(V12) {  params.surge_falloff  = param.asFloat(); delayed_eeprom_write(); };
 
+BLYNK_WRITE(V13) {  params.cool_min  = param.asFloat(); set_cool_min(params.cool_min); delayed_eeprom_write(); };
+BLYNK_WRITE(V14) {  params.cool_max  = param.asFloat(); set_cool_max(params.cool_max); delayed_eeprom_write(); };
+
 
 static void apply_params() {
   // Apply the params we just loaded
   set_target_temperature(params.target_temperature);
   set_kd(params.blade_kd);
   set_ki(params.blade_ki);
+  set_cool_min(params.cool_min);
+  set_cool_max(params.cool_max);
   active_palette = palette_map[params.palette];
   FastLED.setBrightness(params.max_brightness);
 
@@ -138,13 +144,15 @@ static void apply_params() {
       case 9: Blynk.virtualWrite(V10, params.fwd_color_scale); break;
       case 10: Blynk.virtualWrite(V11, params.back_color_scale); break;
       case 11: Blynk.virtualWrite(V12, params.surge_falloff); break;
+      case 12: Blynk.virtualWrite(V13, params.cool_min); break;
+      case 13: Blynk.virtualWrite(V14, params.cool_max); break;
       default:
         // nope
         ;
     }
     Serial.printf("[%ld] Updated %d\n", millis(), update_pin);
     ++update_pin;    
-  }, 12) ;
+  }, 14) ;
 }
 
 

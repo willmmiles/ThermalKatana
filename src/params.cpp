@@ -36,7 +36,8 @@ params_t params = {
     .fwd_color_scale = 100,
     .back_color_scale = -50,
     .surge_falloff = 0.9,
-    .surge_sensitivity = 20
+    .surge_sensitivity = 20,
+    .cool_min = 0, .cool_max = 5,
 };
 
 

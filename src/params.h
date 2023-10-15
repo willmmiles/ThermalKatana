@@ -21,7 +21,8 @@ struct params_t {
   int32_t fwd_color_scale;
   int32_t back_color_scale;
   float surge_falloff;
-  float surge_sensitivity;  
+  float surge_sensitivity;
+  float cool_min, cool_max;  // Cooling parameters, in percent
 };
 #pragma pack(pop)
 
