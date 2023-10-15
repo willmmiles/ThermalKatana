@@ -46,11 +46,10 @@ temperature_array_t smooth_temperatures(const temperature_array_t &input) {
 temperature_array_t cool(const temperature_array_t &input, int ambient) {
   // TODO: do we need to return the whole array?
   temperature_array_t output = temperature_array_t::Zero();;
-  constexpr int pixel_count[] = { 0, 0, 1, 1, 1, 1, 1, 1, 2, 2 };
+  //constexpr int pixel_count[] = { 0, 0, 1, 1, 1, 1, 1, 1, 2, 2 };
   auto n_pixels = random(6);
-  for (int i = 0; i < pixel_count[n_pixels]; i++) {
-    auto j = random(NUM_LEDS);
-    output[j] -= (random(-5,30) * (input[j] - ambient)) / 100;  // lose between 20 and 50% of the value randomly
+  for (int j = 0; j < NUM_LEDS; j++) {
+    output[j] -= (random(2,15) * (input[j] - ambient)) / 100;  // lose between 2 and 10% of the value randomly
     output[j] = max(output[j], ambient - input[j]);  // don't cool below ambient
   }
   return output;
@@ -60,7 +59,7 @@ temperature_array_t cool(const temperature_array_t &input, int ambient) {
 temperature_array_t control(const temperature_array_t &input, float ki, float kd, int target, Eigen::Array<float,NUM_LEDS,1>& integral) {
     auto error = Eigen::Array<float,NUM_LEDS,1> { (target - input).cast<float>() };
     integral += error * dT;
-    return ((kd * error) + (ki * integral)).cast<int>().cwiseMax(-CONTROL_MAX).cwiseMin(CONTROL_MAX);
+    return ((kd * error) + (ki * integral)).cast<int>().cwiseMax(0); //.cwiseMin(CONTROL_MAX);
 }
 
 
@@ -78,7 +77,7 @@ led_value_t simulate_temperature() {
 
   // Finally apply the results
   temperature += temperature_change;
-  temperature = temperature.cwiseMax(0).cwiseMin(10000);
+  temperature = temperature.cwiseMax(0);
 
   //print_array(temperature);
 
