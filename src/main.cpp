@@ -13,7 +13,7 @@
 #define BLYNK_TEMPLATE_NAME "Thermal Katana"
 //#define BLYNK_AUTH_TOKEN "dj4ewPU05Ra1Du9kHgQP_eOpjyPKVYk7"
 
-#define BLYNK_FIRMWARE_VERSION        "0.1.0"
+#define BLYNK_FIRMWARE_VERSION        "0.5.0"
 
 /* Comment this out to disable prints and save space */
 #define BLYNK_PRINT Serial
@@ -186,18 +186,16 @@ void sim_timer_event()
     auto led_values = simulate_temperature();
     auto led_brightness = brightness_array_t { brightness_array_t::Constant( params.base_brightness) };
 
-    Serial.printf("[%ld] %f, %f, %f\n", millis(), accel_values[0], accel_values[1], accel_values[2]);
+    //Serial.printf("[%ld] %f, %f, %f\n", millis(), accel_values[0], accel_values[1], accel_values[2]);
 
     // Apply effects
-    sparkle(led_brightness);
+    //sparkle(led_brightness);
     //wave(led_values);
-
     energy_forward(led_values, led_brightness, accel_values[0] / params.acc_sensitivity,  params.fwd_color_scale);
     //energy_forward(led_values, led_brightness, fabs(accel_values[2]) /  params.gyro_sensitivity,  params.fwd_color_scale);
     surge(led_brightness, accel_values[1]);
 
     for(auto i = 0U; i < NUM_LEDS; ++i) {
-      //leds[i] = HeatColor(led_values[i]);
       leds[i] = ColorFromPalette(*active_palette, (led_values[i] / 40) % 256, min(led_brightness[i], (uint16_t) 255));
     }
     FastLED.show();
@@ -211,7 +209,7 @@ void setup() {
   // Show an indicator LED while we start up
   leds.fill({0,0,0});
   leds[0].r = 128;
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds.data(), leds.size()).setCorrection( TypicalLEDStrip );
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds.data(), leds.size()).setCorrection( TypicalLEDStrip );  
   BlynkEdgent.begin();
 
   // embiggen the eeprom range for dmp calibration
