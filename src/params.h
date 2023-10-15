@@ -21,7 +21,7 @@ struct params_t {
   int32_t fwd_color_scale;
   int32_t back_color_scale;
   float surge_falloff;
-  float surge_sensitivity;
+  float surge_sensitivity;  
 };
 #pragma pack(pop)
 
@@ -30,4 +30,5 @@ extern params_t params;
 
 // Methods
 void init_params();
-void save_params();
+void load_params(unsigned slot);
+void save_params(unsigned slot);

@@ -3,9 +3,14 @@
 #include "params.h"
 
 // Magic values
-constexpr auto EEPROM_CONFIG_START = 0x100;
+constexpr auto EEPROM_CONFIG_START = 0x100U;
+constexpr auto EEPROM_PARAM_STRIDE = 0x100U;
+constexpr auto NUM_SLOTS = 10U;
 constexpr auto EEPROM_MAGIC = (int32_t) 0xDDAADD00;
 constexpr auto EEPROM_CURRENT_VERSION = (int32_t) 1;
+
+static_assert(EEPROM_PARAM_STRIDE >= sizeof(params_t), "Param structure is too large!");
+static_assert(EEPROM_CONFIG_START + (NUM_SLOTS * EEPROM_PARAM_STRIDE) <= SPI_FLASH_SEC_SIZE);   // or other eeprom size limit?
 
 // Old parameter types
 struct params_v0 {
@@ -34,29 +39,34 @@ params_t params = {
     .surge_sensitivity = 20
 };
 
+
 // Methods
 void init_params() {
+    EEPROM.begin(EEPROM_CONFIG_START + (NUM_SLOTS * EEPROM_PARAM_STRIDE));
+    load_params(0);
+}
+
+void load_params(unsigned slot) {
+    auto addr = EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE;
     // Check the magic number
     decltype(params.magic) magic;
-    EEPROM.get(EEPROM_CONFIG_START, magic);
+    EEPROM.get(addr, magic);
 
     if (magic == EEPROM_MAGIC + EEPROM_CURRENT_VERSION) {
         // Just read 'em in
-        EEPROM.get(EEPROM_CONFIG_START, params);
+        EEPROM.get(addr, params);
     }
     // No dice, check old versions
     else if (magic == EEPROM_MAGIC + 0) {
         auto old_params = params_v0 {};
-        EEPROM.get(EEPROM_CONFIG_START, old_params);
+        EEPROM.get(addr, old_params);
         // Copy the known values
         memcpy(&params.gyro_offset, &old_params.gyro_offset, sizeof(params.gyro_offset));
         memcpy(&params.accel_offset, &old_params.accel_offset, sizeof(params.accel_offset));
     }
-    // Everything else is defaulted        
-    // so all done!
 }
 
-void save_params() {
-  EEPROM.put(EEPROM_CONFIG_START, params);
+void save_params(unsigned slot) {
+  EEPROM.put(EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE, params);
   EEPROM.commit();
 }

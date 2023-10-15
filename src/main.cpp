@@ -54,7 +54,7 @@ void delayed_eeprom_write() {
     timer_handle.restartTimer();
   } else {
     timer_handle = timer_core.setTimeout(EEPROM_DELAY, [&](){
-      save_params();
+      save_params(0);
       // invalidate handle
       timer_handle = BlynkTimer::Handle {}; 
     });
@@ -111,7 +111,7 @@ BLYNK_WRITE(V52) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param
 BLYNK_WRITE(V53) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
 BLYNK_WRITE(V54) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
 BLYNK_WRITE(V55) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
-BLYNK_WRITE(V56) { save_params(); };
+BLYNK_WRITE(V56) { save_params(0); };
 
 // This function is called every time the device is connected to the Blynk.Cloud
 BLYNK_CONNECTED()
@@ -213,7 +213,6 @@ void setup() {
   BlynkEdgent.begin();
 
   // embiggen the eeprom range for dmp calibration
-  EEPROM.begin(0x200);
   init_params();
   // Apply initial parameters
   set_target_temperature(params.target_temperature);
