@@ -8,7 +8,6 @@
 #include <EEPROM.h>
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
-#include "params.h"
 #include "dmp.h"
 
 constexpr auto EEPROM_CONFIG_START = 0x100;
@@ -31,12 +30,12 @@ static auto last_delta_pos = Eigen::Vector3f { 0, 0 ,0 };
 
 void dmp_set_offset(dmp_axis axis, int16_t value) {
   switch(axis) {
-    case dmp_axis::gyro_x: params.gyro_offset[0] = value; mpu.setXGyroOffset(value); break;
-    case dmp_axis::gyro_y: params.gyro_offset[1] = value; mpu.setYGyroOffset(value); break;
-    case dmp_axis::gyro_z: params.gyro_offset[2] = value; mpu.setZGyroOffset(value); break;
-    case dmp_axis::accel_x: params.accel_offset[0] = value; mpu.setXAccelOffset(value); break;
-    case dmp_axis::accel_y: params.accel_offset[1] = value; mpu.setYAccelOffset(value); break;
-    case dmp_axis::accel_z: params.accel_offset[2] = value; mpu.setZAccelOffset(value); break;       
+    case dmp_axis::gyro_x: mpu.setXGyroOffset(value); break;
+    case dmp_axis::gyro_y: mpu.setYGyroOffset(value); break;
+    case dmp_axis::gyro_z: mpu.setZGyroOffset(value); break;
+    case dmp_axis::accel_x: mpu.setXAccelOffset(value); break;
+    case dmp_axis::accel_y: mpu.setYAccelOffset(value); break;
+    case dmp_axis::accel_z: mpu.setZAccelOffset(value); break;       
   }
 
   // Re-run the calibration since we've adjusted the offsets
@@ -49,7 +48,7 @@ static void set_default(int16_t& target, int16_t value) {
   if (target == INT16_MIN) target = value;
 }
 
-void init_dmp() {
+void init_dmp(int16_t gyro_offset[3], int16_t accel_offset[3]) {
   // join I2C bus (I2Cdev library doesn't do this automatically)
   #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
       Wire.begin();
@@ -71,19 +70,19 @@ void init_dmp() {
     auto devStatus = mpu.dmpInitialize();
 
     // load gyro offsets, if unused
-    set_default(params.gyro_offset[0], mpu.getGyroXSelfTestFactoryTrim());
-    set_default(params.gyro_offset[1], mpu.getGyroYSelfTestFactoryTrim());
-    set_default(params.gyro_offset[2], mpu.getGyroZSelfTestFactoryTrim());
-    set_default(params.accel_offset[0], mpu.getAccelXSelfTestFactoryTrim());
-    set_default(params.accel_offset[1], mpu.getAccelYSelfTestFactoryTrim());
-    set_default(params.accel_offset[2], mpu.getAccelZSelfTestFactoryTrim());
+    set_default(gyro_offset[0], mpu.getGyroXSelfTestFactoryTrim());
+    set_default(gyro_offset[1], mpu.getGyroYSelfTestFactoryTrim());
+    set_default(gyro_offset[2], mpu.getGyroZSelfTestFactoryTrim());
+    set_default(accel_offset[0], mpu.getAccelXSelfTestFactoryTrim());
+    set_default(accel_offset[1], mpu.getAccelYSelfTestFactoryTrim());
+    set_default(accel_offset[2], mpu.getAccelZSelfTestFactoryTrim());
 
-    mpu.setXGyroOffset(params.gyro_offset[0]);
-    mpu.setYGyroOffset(params.gyro_offset[1]);
-    mpu.setZGyroOffset(params.gyro_offset[2]);
-    mpu.setXAccelOffset(params.accel_offset[0]);
-    mpu.setYAccelOffset(params.accel_offset[1]);
-    mpu.setZAccelOffset(params.accel_offset[2]);
+    mpu.setXGyroOffset(gyro_offset[0]);
+    mpu.setYGyroOffset(gyro_offset[1]);
+    mpu.setZGyroOffset(gyro_offset[2]);
+    mpu.setXAccelOffset(accel_offset[0]);
+    mpu.setYAccelOffset(accel_offset[1]);
+    mpu.setZAccelOffset(accel_offset[2]);
 
     Serial.printf("Factory trim Gyro: %d, %d ,%d\n",mpu.getGyroXSelfTestFactoryTrim(),mpu.getGyroYSelfTestFactoryTrim(),mpu.getGyroZSelfTestFactoryTrim());
     Serial.printf("Factory trim Accel: %d, %d ,%d\n",mpu.getAccelXSelfTestFactoryTrim(),mpu.getAccelYSelfTestFactoryTrim(),mpu.getAccelZSelfTestFactoryTrim());

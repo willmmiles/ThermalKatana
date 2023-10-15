@@ -104,14 +104,66 @@ BLYNK_WRITE(V11) {  params.back_color_scale = param.asInt(); delayed_eeprom_writ
 BLYNK_WRITE(V12) {  params.surge_falloff  = param.asFloat(); delayed_eeprom_write(); };
 
 
+static void apply_params() {
+  // Apply the params we just loaded
+  set_target_temperature(params.target_temperature);
+  set_kd(params.blade_kd);
+  set_ki(params.blade_ki);
+  active_palette = palette_map[params.palette];
+  FastLED.setBrightness(params.max_brightness);
+  for (auto i = 0; i < 3; ++i) {
+    dmp_set_offset(static_cast<dmp_axis>(i), params.gyro_offset[i]);
+    dmp_set_offset(static_cast<dmp_axis>(i+3), params.accel_offset[i]);
+  }
 
-BLYNK_WRITE(V50) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
-BLYNK_WRITE(V51) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
-BLYNK_WRITE(V52) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
-BLYNK_WRITE(V53) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
-BLYNK_WRITE(V54) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
-BLYNK_WRITE(V55) { dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write(); };  
-BLYNK_WRITE(V56) { save_params(0); };
+  // Also tell Blynk
+  if (Blynk.connected()) {
+    Blynk.beginGroup();
+    Blynk.virtualWrite(V1, params.blade_kd);
+    Blynk.virtualWrite(V2, params.blade_ki);
+    Blynk.virtualWrite(V3, params.palette);
+    Blynk.virtualWrite(V4, params.base_brightness);
+    Blynk.virtualWrite(V5, params.max_brightness);
+    Blynk.virtualWrite(V6, params.acc_sensitivity);
+    Blynk.virtualWrite(V7, params.gyro_sensitivity);
+    Blynk.virtualWrite(V8, params.surge_sensitivity);
+    Blynk.virtualWrite(V10, params.fwd_color_scale);
+    Blynk.virtualWrite(V11, params.back_color_scale);
+    Blynk.virtualWrite(V12, params.surge_falloff);
+    for (auto i = 0; i < 3; ++i) {
+      Blynk.virtualWrite(50+i, params.gyro_offset[i]);
+      Blynk.virtualWrite(53+i, params.accel_offset[i]);
+    }
+    Blynk.endGroup();
+  }
+}
+
+
+BLYNK_WRITE_DEFAULT() {
+  int pin = request.pin;
+
+  // Common pin blocks
+
+  if ((pin >= 50) && (pin < 56)) {
+    // dmp calibration pin
+    dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write();
+    return;
+  }
+  
+  if ((pin >= 60) && (pin < 70)) {
+    // save params
+    save_params(pin - 60);
+    return;
+  }
+
+
+  if ((pin >= 70) && (pin < 80)) {
+    // save params
+    load_params(pin - 70);
+    apply_params();
+    return;
+  }
+}
 
 // This function is called every time the device is connected to the Blynk.Cloud
 BLYNK_CONNECTED()
@@ -214,14 +266,8 @@ void setup() {
 
   // embiggen the eeprom range for dmp calibration
   init_params();
-  // Apply initial parameters
-  set_target_temperature(params.target_temperature);
-  set_kd(params.blade_kd);
-  set_ki(params.blade_ki);
-  active_palette = palette_map[params.palette];
-  FastLED.setBrightness(params.max_brightness);
-  FastLED.show();
-  init_dmp();
+  init_dmp(params.gyro_offset, params.accel_offset);
+  apply_params(); // apply other parameters
 
   timer_core.setInterval(20L, sim_timer_event);    
 };
