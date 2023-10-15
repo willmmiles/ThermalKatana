@@ -47,6 +47,7 @@ void init_params() {
 }
 
 void load_params(unsigned slot) {
+  if (slot >= NUM_SLOTS) return;
     auto addr = EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE;
     // Check the magic number
     decltype(params.magic) magic;
@@ -67,6 +68,7 @@ void load_params(unsigned slot) {
 }
 
 void save_params(unsigned slot) {
+  if (slot >= NUM_SLOTS) return;
   EEPROM.put(EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE, params);
   EEPROM.commit();
 }
