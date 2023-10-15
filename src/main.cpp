@@ -119,6 +119,7 @@ static void apply_params() {
   // Also tell Blynk
   if (Blynk.connected()) {
     Blynk.beginGroup();
+    Blynk.virtualWrite(V0, params.target_temperature);
     Blynk.virtualWrite(V1, params.blade_kd);
     Blynk.virtualWrite(V2, params.blade_ki);
     Blynk.virtualWrite(V3, params.palette);
@@ -152,15 +153,21 @@ BLYNK_WRITE_DEFAULT() {
   
   if ((pin >= 60) && (pin < 70)) {
     // save params
-    save_params(pin - 60);
+    if (param.asInt() != 0) {
+      save_params(pin - 60);
+      Serial.printf("[%ld] Saved slot %d\n",millis(),pin-60);
+    }
     return;
   }
 
 
   if ((pin >= 70) && (pin < 80)) {
     // save params
-    load_params(pin - 70);
-    apply_params();
+    if (param.asInt() != 0) {
+      Serial.printf("[%ld] Loading slot %d\n",millis(),pin-70);
+      load_params(pin - 70);
+      apply_params();
+    }
     return;
   }
 }
