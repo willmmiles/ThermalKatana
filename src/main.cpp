@@ -21,18 +21,19 @@
 #define APP_DEBUG
 #define USE_NODE_MCU_BOARD
 
-
+#include <eigen.h>  // must be before Arduino.h
 #include <Arduino.h>
 #include <FastLED.h>                     // needed for WS2812B LEDs
 #include "BlynkEdgent.h"
 #include "blade_simulation.h"
 #include "dmp.h"
 #include "params.h"
+#include "filter.h"
 
 BlynkTimer timer_core;
 
 std::array<CRGB,NUM_LEDS> leds;
-typedef Eigen::Array<uint16_t, NUM_LEDS, 1> brightness_array_t;
+typedef Eigen::Array<uint16_t, NUM_LEDS, 1> state_array_t;
 
 // Enum index to ap
 const std::array<decltype(HeatColors_p)*, 7> palette_map = {
@@ -89,7 +90,6 @@ BLYNK_WRITE(V4) { params.base_brightness = param.asInt(); delayed_eeprom_write()
 BLYNK_WRITE(V5)
 {
   params.max_brightness = param.asInt();
-  FastLED.setBrightness(params.max_brightness);
   delayed_eeprom_write();
 }
 
@@ -115,7 +115,6 @@ static void apply_params() {
   set_cool_min(params.cool_min);
   set_cool_max(params.cool_max);
   active_palette = palette_map[params.palette];
-  FastLED.setBrightness(params.max_brightness);
 
   // We don't load the gyro parameters - restore them from the device
   for (auto i = 0; i < 3; ++i) {
@@ -194,9 +193,11 @@ BLYNK_CONNECTED()
 {
 }
 
-void sparkle(brightness_array_t& array) {
+// Adds luminance??
+/*
+void sparkle(decltype(leds)& array) {
   constexpr int pixel_count[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2 };
-  static brightness_array_t history;
+  static state_array_t history = state_array_t::Zero();
   history /= 5;
   
   auto n_pixels = random(sizeof(pixel_count) / sizeof(int));
@@ -204,9 +205,17 @@ void sparkle(brightness_array_t& array) {
     auto j = random(NUM_LEDS);
     history[j] = 120;
   }
+  for (auto i = 0U; i < array.size(); ++i) {
+    if (history[i] > 0) {
+      auto hsv = CHSV(array[i]);
+    }
+  }
+
   array += history;
 };
+*/
 
+// Add temperature in the simulation
 void wave(led_value_t& values) {
   static size_t start_index = 0;
   constexpr uint16_t wave_values[] = { 1, 1, 2, 3, 4, 5, 4, 3, 2, 1, 1 };
@@ -216,8 +225,8 @@ void wave(led_value_t& values) {
   start_index = (start_index + 1) % NUM_LEDS;
 }
 
-void energy_forward(led_value_t& values, brightness_array_t& brightness, float new_energy, uint16_t color_scale) {
-  static brightness_array_t state = brightness_array_t::Zero();
+void energy_forward(led_value_t& values, float new_energy, uint16_t color_scale) {
+  static state_array_t state = state_array_t::Zero();
   static size_t index = 0;
   if (new_energy < 0.) new_energy = 0;
   if (new_energy > 120) new_energy = 120;
@@ -225,14 +234,13 @@ void energy_forward(led_value_t& values, brightness_array_t& brightness, float n
   state[index] = (uint16_t) new_energy;
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
-    // brightness[led_index] += state[state_index];
     values[led_index] += state[state_index] * color_scale;
   }
   if (index) { --index; } else { index = NUM_LEDS - 1; };
 };
 
-void energy_backward(led_value_t& values, brightness_array_t& brightness, float new_energy, uint16_t color_scale) {
-  static brightness_array_t state = brightness_array_t::Zero();
+void energy_backward(led_value_t& values, float new_energy, uint16_t color_scale) {
+  static state_array_t state = state_array_t::Zero();
   static size_t index = NUM_LEDS - 1;
   if (new_energy < 0.) new_energy = 0;
   if (new_energy > 120) new_energy = 120;
@@ -240,19 +248,30 @@ void energy_backward(led_value_t& values, brightness_array_t& brightness, float 
   state[index] = (uint16_t) new_energy;
   for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
     auto state_index = (led_index + index) % NUM_LEDS;
-    //brightness[led_index] += state[state_index];
     values[led_index] += state[state_index] * color_scale;
   }
   if (index == NUM_LEDS) { index = 0; } else { ++index; };
 };
 
-void surge(brightness_array_t& brightness, float amount) {
-  static double state = 0.;
-  amount *= params.surge_sensitivity;
-  if (amount < 0.) amount = 0;
-  if (amount > 120) amount = 120;
-  state = (state * params.surge_falloff) + amount;
-  brightness += std::min(state,255.);
+float surge(float amount) {
+  auto update_amount = amount * params.surge_sensitivity;
+  if (update_amount < 0.) update_amount = 0;
+  if (update_amount > 200) update_amount = 200;
+
+  // 20Hz butterworth
+  static auto filter = xir_filter<float, 3>(14.824637753965225, {0.41280159809618855,-1.142980502539901,1}, {1,2,1});
+
+  auto state = filter(update_amount);
+  auto result = std::min(state,256.f) / 256.f;
+/*
+  bool v = (state > 1);
+  static bool last_print = false;
+  if (v || last_print) {
+    Serial.printf("[%ld] %f - %f -- %f\n", millis(), state, update_amount, result * (params.max_brightness - params.base_brightness));
+    last_print = v;
+  }
+*/
+  return result;
 };
 
 // This function sends Arduino's uptime every second to Virtual Pin 2.
@@ -260,21 +279,24 @@ void sim_timer_event()
 {
     auto accel_values = read_dmp();
     auto led_values = simulate_temperature();
-    auto led_brightness = brightness_array_t { brightness_array_t::Constant( params.base_brightness) };
 
     //Serial.printf("[%ld] %f, %f, %f\n", millis(), accel_values[0], accel_values[1], accel_values[2]);
 
-    // Apply effects
-    //sparkle(led_brightness);
+    // Apply effects    
     //wave(led_values);
-    energy_forward(led_values, led_brightness, accel_values[0] / params.acc_sensitivity,  params.fwd_color_scale);
-    //energy_forward(led_values, led_brightness, fabs(accel_values[2]) /  params.gyro_sensitivity,  params.fwd_color_scale);
-    surge(led_brightness, accel_values[1]);
+    energy_forward(led_values, accel_values[0] / params.acc_sensitivity,  params.fwd_color_scale);
+    //energy_forward(led_values, fabs(accel_values[2]) /  params.gyro_sensitivity,  params.fwd_color_scale);
+    auto surge_brightness = surge(accel_values[1]);
+    auto total_brightness = params.base_brightness + (params.max_brightness - params.base_brightness) * surge_brightness;
 
     for(auto i = 0U; i < NUM_LEDS; ++i) {
-      leds[i] = ColorFromPalette(*active_palette, (led_values[i] / 40) % 256, min(led_brightness[i], (uint16_t) 255));
+      leds[i] = ColorFromPalette(*active_palette, (led_values[i] / 40) % 256, std::min((int) total_brightness, 255));
     }
-    FastLED.show();
+
+    //sparkle(leds);
+
+    //FastLED.setBrightness();
+    //FastLED.show();
 }
 
 
@@ -285,7 +307,8 @@ void setup() {
   // Show an indicator LED while we start up
   leds.fill({0,0,0});
   leds[0].r = 128;
-  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds.data(), leds.size()).setCorrection( TypicalLEDStrip );  
+  FastLED.addLeds<LED_TYPE, LED_PIN, COLOR_ORDER>(leds.data(), leds.size());//.setCorrection( TypicalLEDStrip );    
+  FastLED.setDither(BINARY_DITHER);
   BlynkEdgent.begin();
 
   // embiggen the eeprom range for dmp calibration
@@ -302,6 +325,7 @@ void app_loop()
   edgentTimer.run();
   edgentConsole.run();
   timer_core.run();  
+  FastLED.show();
 }
 
 void loop() {
