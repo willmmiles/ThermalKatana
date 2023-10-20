@@ -32,6 +32,8 @@ static auto sample_count = 0U;
 static auto last_orientation_abs = Eigen::Quaternion<float> {};
 static auto last_position = Eigen::Vector3f { 0, 0, 0 };
 static auto last_delta_pos = Eigen::Vector3f { 0, 0 ,0 };
+// If we don't have a packet, return the last saved value
+static auto last_result = Eigen::Vector3f { 0, 0 ,0 };
 
 
 void dmp_set_offset(dmp_axis axis, int16_t value) {
@@ -133,7 +135,7 @@ void init_dmp(int16_t gyro_offset[3], int16_t accel_offset[3]) {
 
 Eigen::Vector3f read_dmp()
 {
-  Eigen::Vector3f result = {0., 0., 0.};
+  Eigen::Vector3f result;
 
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
@@ -190,13 +192,15 @@ Eigen::Vector3f read_dmp()
             Serial.printf("G vector: %f, %f, %f\n",g_vector[0],g_vector[1], g_vector[2]);          
           }
         }
-        ++sample_count;
+        ++sample_count;        
+        result.setZero();
       }
 
-      last_orientation_abs = orientation_abs;
-      
-  };
+      last_orientation_abs = orientation_abs;      
+      last_result = result;
+  } else {
+    result = last_result;
+  }
 
   return result;
 }
-
