@@ -13,7 +13,7 @@
 #define BLYNK_TEMPLATE_NAME "Thermal Katana"
 #define BLYNK_SSL_TX_BUF_SIZE 1024
 #define BLYNK_MSG_LIMIT 0
-#define BLYNK_FIRMWARE_VERSION        "0.5.0"
+#define BLYNK_FIRMWARE_VERSION        "0.9.0"
 
 /* Comment this out to disable prints and save space */
 #define BLYNK_PRINT Serial
