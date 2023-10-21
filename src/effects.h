@@ -43,7 +43,7 @@ class energy {
         lights.segment(0, split) += state.segment(index, split).template cast<uint16_t>();
         lights.segment(split, index) += state.segment(0, index).template cast<uint16_t>();
 
-        index = (index + size + shift) % size;
+        index = (index + size - shift) % size;
     }  
 };
 
