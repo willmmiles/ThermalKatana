@@ -22,8 +22,8 @@ constexpr auto CALIBRATE_SAMPLES = 50U; // samples
 static MPU6050 mpu;
 // Calibration state
 // We keep this in memory as we can't get it back from the DPU if it fails to initialize.
-int16_t active_gyro_offset[3];
-int16_t active_accel_offset[3];
+static int16_t active_gyro_offset[3];
+static int16_t active_accel_offset[3];
 
 // G analysis
 static auto g_vector = Eigen::Vector<float, 3> {};
@@ -35,6 +35,7 @@ static auto last_delta_pos = Eigen::Vector3f { 0, 0 ,0 };
 // If we don't have a packet, return the last saved value
 static auto last_result = Eigen::Vector3f { 0, 0 ,0 };
 
+static bool calibrating = false;
 
 void dmp_set_offset(dmp_axis axis, int16_t value) {
   switch(axis) {
@@ -99,7 +100,7 @@ void init_dmp(int16_t gyro_offset[3], int16_t accel_offset[3]) {
     set_default(accel_offset[2], mpu.getAccelZSelfTestFactoryTrim());
 
     memcpy(active_gyro_offset, gyro_offset, sizeof(active_gyro_offset));
-    memcpy(active_accel_offset, accel_offset, sizeof(accel_offset));
+    memcpy(active_accel_offset, accel_offset, sizeof(active_accel_offset));
 
     mpu.setXGyroOffset(gyro_offset[0]);
     mpu.setYGyroOffset(gyro_offset[1]);
@@ -150,9 +151,9 @@ Eigen::Vector3f read_dmp()
       auto accel_rel = Eigen::Map<Eigen::Vector<int16_t, 3>>(&aa.x).cast<float>();
       auto accel_abs = Eigen::Vector3f { orientation_abs * accel_rel };
 
-      // uncomment for calibration
-      // TODO: send this back to Blynk?
-      // Serial.printf("[%f, %f, %f]\n",accel_rel[0], accel_rel[1], accel_rel[2]);
+      if (calibrating) {
+        Serial.printf("[%f, %f, %f]\n",accel_rel[0], accel_rel[1], accel_rel[2]);
+      };
 
       if (sample_count > (STARTUP_DELAY+CALIBRATE_SAMPLES)) {
         auto delta_angle = orientation_abs.angularDistance(last_orientation_abs);
@@ -203,4 +204,9 @@ Eigen::Vector3f read_dmp()
   }
 
   return result;
+}
+
+// Enable calibration prints
+void set_calibrating(bool b) {
+  calibrating = b;
 }
