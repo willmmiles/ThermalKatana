@@ -12,7 +12,7 @@ class xir_filter {
     array_t x, y;
 
     public:
-    xir_filter(T gain_, array_t a, array_t b) : gain(gain_), a_coeff(std::move(a)), b_coeff(std::move(b)), x(array_t::Zero()), y(array_t::Zero()) {};
+    xir_filter(T gain_, array_t a, array_t b) : a_coeff(std::move(a)), b_coeff(std::move(b)), gain(gain_), x(array_t::Zero()), y(array_t::Zero()) {};
 
     T operator()(T input) {
         x.head(C-1) = x.tail(C-1);  // shift by one -- does this work?

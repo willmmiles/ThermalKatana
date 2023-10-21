@@ -27,13 +27,12 @@
 #include "BlynkEdgent.h"
 #include "blade_simulation.h"
 #include "dmp.h"
+#include "effects.h"
 #include "params.h"
-#include "filter.h"
 
 BlynkTimer timer_core;
 
 std::array<CRGB,NUM_LEDS> leds;
-typedef Eigen::Array<uint16_t, NUM_LEDS, 1> state_array_t;
 
 // Enum index to ap
 const std::array<decltype(HeatColors_p)*, 7> palette_map = {
@@ -193,87 +192,6 @@ BLYNK_CONNECTED()
 {
 }
 
-// Adds luminance??
-/*
-void sparkle(decltype(leds)& array) {
-  constexpr int pixel_count[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 1, 2 };
-  static state_array_t history = state_array_t::Zero();
-  history /= 5;
-  
-  auto n_pixels = random(sizeof(pixel_count) / sizeof(int));
-  for (int i = 0; i < pixel_count[n_pixels]; i++) {
-    auto j = random(NUM_LEDS);
-    history[j] = 120;
-  }
-  for (auto i = 0U; i < array.size(); ++i) {
-    if (history[i] > 0) {
-      auto hsv = CHSV(array[i]);
-    }
-  }
-
-  array += history;
-};
-*/
-
-// Add temperature in the simulation
-void wave(led_value_t& values) {
-  static size_t start_index = 0;
-  constexpr uint16_t wave_values[] = { 1, 1, 2, 3, 4, 5, 4, 3, 2, 1, 1 };
-  for (auto i = 0U; i < sizeof(wave_values) / sizeof(uint16_t); ++i) {
-    values[(start_index + i) % NUM_LEDS] += wave_values[i] * 1000;
-  };
-  start_index = (start_index + 1) % NUM_LEDS;
-}
-
-void energy_forward(led_value_t& values, float new_energy, uint16_t color_scale) {
-  static state_array_t state = state_array_t::Zero();
-  static size_t index = 0;
-  if (new_energy < 0.) new_energy = 0;
-  if (new_energy > 120) new_energy = 120;
-
-  state[index] = (uint16_t) new_energy;
-  for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
-    auto state_index = (led_index + index) % NUM_LEDS;
-    values[led_index] += state[state_index] * color_scale;
-  }
-  if (index) { --index; } else { index = NUM_LEDS - 1; };
-};
-
-void energy_backward(led_value_t& values, float new_energy, uint16_t color_scale) {
-  static state_array_t state = state_array_t::Zero();
-  static size_t index = NUM_LEDS - 1;
-  if (new_energy < 0.) new_energy = 0;
-  if (new_energy > 120) new_energy = 120;
-
-  state[index] = (uint16_t) new_energy;
-  for(auto led_index = 0; led_index < NUM_LEDS; ++led_index) {
-    auto state_index = (led_index + index) % NUM_LEDS;
-    values[led_index] += state[state_index] * color_scale;
-  }
-  if (index == NUM_LEDS) { index = 0; } else { ++index; };
-};
-
-float surge(float amount) {
-  auto update_amount = amount * params.surge_sensitivity;
-  if (update_amount < 0.) update_amount = 0;
-  if (update_amount > 200) update_amount = 200;
-
-  // 20Hz butterworth
-  static auto filter = xir_filter<float, 3>(14.824637753965225, {0.41280159809618855,-1.142980502539901,1}, {1,2,1});
-
-  auto state = filter(update_amount);
-  auto result = std::min(state,256.f) / 256.f;
-/*
-  bool v = (state > 1);
-  static bool last_print = false;
-  if (v || last_print) {
-    Serial.printf("[%ld] %f - %f -- %f\n", millis(), state, update_amount, result * (params.max_brightness - params.base_brightness));
-    last_print = v;
-  }
-*/
-  return result;
-};
-
 // This function sends Arduino's uptime every second to Virtual Pin 2.
 void sim_timer_event()
 {
@@ -283,10 +201,11 @@ void sim_timer_event()
     //Serial.printf("[%ld] %f, %f, %f\n", millis(), accel_values[0], accel_values[1], accel_values[2]);
 
     // Apply effects    
-    //wave(led_values);
-    energy_forward(led_values, accel_values[0] / params.acc_sensitivity,  params.fwd_color_scale);
-    //energy_forward(led_values, fabs(accel_values[2]) /  params.gyro_sensitivity,  params.fwd_color_scale);
-    auto surge_brightness = surge(accel_values[1]);
+    static energy<NUM_LEDS> energy_forward;
+    energy_forward(led_values, accel_values[0] * params.acc_sensitivity);
+
+    static surge surge_state;
+    auto surge_brightness = surge_state(accel_values[1] * params.surge_sensitivity);
     auto total_brightness = params.base_brightness + (params.max_brightness - params.base_brightness) * surge_brightness;
 
     for(auto i = 0U; i < NUM_LEDS; ++i) {
