@@ -117,7 +117,6 @@ static void apply_params() {
   set_ki(params.blade_ki);
   set_cool_min(params.cool_min);
   set_cool_max(params.cool_max);
-  active_palette = palette_map[params.palette];
 
   // We don't load the gyro parameters - restore them from the device
   for (auto i = 0; i < 3; ++i) {
@@ -207,17 +206,17 @@ BLYNK_CONNECTED()
 // This function sends Arduino's uptime every second to Virtual Pin 2.
 void sim_timer_event()
 {
-    auto accel_values = read_dmp();
+    auto dmp = read_dmp();
     auto led_values = simulate_temperature();
 
     //Serial.printf("[%ld] %f, %f, %f\n", millis(), accel_values[0], accel_values[1], accel_values[2]);
 
     // Apply effects    
     static energy<NUM_LEDS> energy_forward;
-    energy_forward(led_values, accel_values[0] * params.acc_sensitivity);
+    energy_forward(led_values, dmp.results[0] * params.acc_sensitivity);
 
     static surge surge_state;
-    auto surge_brightness = surge_state(accel_values[1] * params.surge_sensitivity);
+    auto surge_brightness = surge_state(dmp.results[1] * params.surge_sensitivity);
     auto total_brightness = params.base_brightness + (params.max_brightness - params.base_brightness) * surge_brightness;
 
     auto& active_palette = palette_map[params.palette];
@@ -235,10 +234,12 @@ void sim_timer_event()
       leds[i] = ColorFromPalette(active_palette.palette, static_cast<uint8>(led_value), std::min((int) total_brightness, 255), LINEARBLEND);
     }
 
-    //sparkle(leds);
-
-    //FastLED.setBrightness();
-    //FastLED.show();
+/* This is *SUPER* slow -- uploads take 60-90ms
+    static auto upload_index = 0;
+    auto& upload_value = (upload_index >= 3) ? dmp.accels[upload_index - 3] : dmp.gyros[upload_index];
+    Blynk.virtualWrite(40 + upload_index, upload_value);
+    upload_index = (upload_index + 1) % 6;
+*/    
 }
 
 

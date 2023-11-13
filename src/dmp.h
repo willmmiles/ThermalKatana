@@ -19,4 +19,10 @@ void init_dmp(int16_t gyro_offset[3], int16_t accel_offset[3]); // send INT16_MI
 void dmp_set_offset(dmp_axis, int16_t value);
 int16_t dmp_get_offset(dmp_axis);
 
-Eigen::Vector3f read_dmp();
+struct dmp_data {
+    Eigen::Vector<int16_t, 3> gyros;
+    Eigen::Vector<int16_t, 3> accels;
+    Eigen::Vector3f results; // accel - G, tip delta pos, delta angle
+};
+
+dmp_data read_dmp();

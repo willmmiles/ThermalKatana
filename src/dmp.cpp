@@ -33,7 +33,7 @@ static auto last_orientation_abs = Eigen::Quaternion<float> {};
 static auto last_position = Eigen::Vector3f { 0, 0, 0 };
 static auto last_delta_pos = Eigen::Vector3f { 0, 0 ,0 };
 // If we don't have a packet, return the last saved value
-static auto last_result = Eigen::Vector3f { 0, 0 ,0 };
+static auto last_result = dmp_data { { 0, 0 ,0 }, { 0, 0 ,0 }, { 0, 0 ,0 } };
 
 static bool calibrating = false;
 
@@ -102,15 +102,19 @@ void init_dmp(int16_t gyro_offset[3], int16_t accel_offset[3]) {
     memcpy(active_gyro_offset, gyro_offset, sizeof(active_gyro_offset));
     memcpy(active_accel_offset, accel_offset, sizeof(active_accel_offset));
 
-    mpu.setXGyroOffset(gyro_offset[0]);
-    mpu.setYGyroOffset(gyro_offset[1]);
-    mpu.setZGyroOffset(gyro_offset[2]);
-    mpu.setXAccelOffset(accel_offset[0]);
-    mpu.setYAccelOffset(accel_offset[1]);
-    mpu.setZAccelOffset(accel_offset[2]);
+
+
+    mpu.setXGyroOffset(active_gyro_offset[0]);
+    mpu.setYGyroOffset(active_gyro_offset[1]);
+    mpu.setZGyroOffset(active_gyro_offset[2]);
+    mpu.setXAccelOffset(active_accel_offset[0]);
+    mpu.setYAccelOffset(active_accel_offset[1]);
+    mpu.setZAccelOffset(active_accel_offset[2]);
 
     Serial.printf("Factory trim Gyro: %d, %d ,%d\n",mpu.getGyroXSelfTestFactoryTrim(),mpu.getGyroYSelfTestFactoryTrim(),mpu.getGyroZSelfTestFactoryTrim());
-    Serial.printf("Factory trim Accel: %d, %d ,%d\n",mpu.getAccelXSelfTestFactoryTrim(),mpu.getAccelYSelfTestFactoryTrim(),mpu.getAccelZSelfTestFactoryTrim());
+    Serial.printf("Applied Gyro: %d, %d ,%d\n",active_gyro_offset[0],active_gyro_offset[1], active_gyro_offset[2]);
+    Serial.printf("Factory trim Accel: %d, %d ,%d\n",mpu.getAccelXSelfTestFactoryTrim(),mpu.getAccelYSelfTestFactoryTrim(),mpu.getAccelZSelfTestFactoryTrim());    
+    Serial.printf("Applied Accel: %d, %d ,%d\n",active_accel_offset[0], active_accel_offset[1], active_accel_offset[2]);
 
     // make sure it worked (returns 0 if so)
     if (devStatus == 0) {
@@ -134,21 +138,24 @@ void init_dmp(int16_t gyro_offset[3], int16_t accel_offset[3]) {
 
 
 
-Eigen::Vector3f read_dmp()
+dmp_data read_dmp()
 {
-  Eigen::Vector3f result;
+  dmp_data result;
 
   uint8_t fifoBuffer[64]; // FIFO storage buffer
   if (mpu.dmpGetCurrentFIFOPacket(fifoBuffer)) { // Get the Latest packet 
       // parse packet in to raw readings, taken from MPU6050 examples
       Quaternion q;
-      VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-      mpu.dmpGetQuaternion(&q, fifoBuffer);        
+      VectorInt16 gy, aa;         // [x, y, z]            accel sensor measurements
+      mpu.dmpGetQuaternion(&q, fifoBuffer);
+      mpu.dmpGetGyro(&gy, fifoBuffer);
       mpu.dmpGetAccel(&aa, fifoBuffer);
 
       // Uplift to a more fully-featured math library
+      result.gyros =  Eigen::Map<Eigen::Vector<int16_t, 3>>(&gy.x);
       auto orientation_abs = Eigen::Quaternion<float> { q.w, q.x, q.y, q.z };
-      auto accel_rel = Eigen::Map<Eigen::Vector<int16_t, 3>>(&aa.x).cast<float>();
+      result.accels = Eigen::Map<Eigen::Vector<int16_t, 3>>(&aa.x);
+      auto accel_rel = result.accels.cast<float>();
       auto accel_abs = Eigen::Vector3f { orientation_abs * accel_rel };
 
       if (calibrating) {
@@ -177,7 +184,7 @@ Eigen::Vector3f read_dmp()
         static auto accel_return = 0.;
         accel_return = (0.2 * accel_return) + (0.8 * accel_abs.norm());
 
-        result = Eigen::Vector3f { accel_return, delta_pos.norm(), delta_angle };
+        result.results = Eigen::Vector3f { accel_return, delta_pos.norm(), delta_angle };
       } else {
         // DEBUG!        
         Serial.printf("%d [%f, %f, %f, %f] -- %f, %f, %f -- %f, %f, %f\n",
@@ -194,7 +201,7 @@ Eigen::Vector3f read_dmp()
           }
         }
         ++sample_count;        
-        result.setZero();
+        result.results.setZero();
       }
 
       last_orientation_abs = orientation_abs;      
