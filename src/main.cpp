@@ -166,7 +166,15 @@ BLYNK_WRITE_DEFAULT() {
 
   if ((pin >= 50) && (pin < 56)) {
     // dmp calibration pin
-    dmp_set_offset(static_cast<dmp_axis>(request.pin - 50), param.asInt()); delayed_eeprom_write();
+    auto axis = request.pin - 50;
+    auto val = param.asInt();
+    dmp_set_offset(static_cast<dmp_axis>(axis), val);
+    if (axis < 3) {
+      params.gyro_offset[axis] = val;
+    } else {
+      params.accel_offset[axis-3] = val;
+    }
+    delayed_eeprom_write();
     return;
   }
   
