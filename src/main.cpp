@@ -34,17 +34,22 @@ BlynkTimer timer_core;
 
 std::array<CRGB,NUM_LEDS> leds;
 
-// Enum index to ap
-const std::array<decltype(HeatColors_p)*, 7> palette_map = {
-  &HeatColors_p,
-  &PartyColors_p,
-  &RainbowColors_p,
-  &CloudColors_p,
-  &LavaColors_p,
-  &OceanColors_p,
-  &ForestColors_p
+struct palette_info {
+  decltype(HeatColors_p)& palette;
+  TBlendType blend_type;
 };
-decltype(HeatColors_p)* active_palette = palette_map[1];
+
+
+// Enum index to ap
+const std::array<palette_info, 7> palette_map = {{
+  {HeatColors_p, LINEARBLEND_NOWRAP},
+  {PartyColors_p, LINEARBLEND},
+  {RainbowColors_p, LINEARBLEND},
+  {CloudColors_p, LINEARBLEND_NOWRAP},
+  {LavaColors_p, LINEARBLEND_NOWRAP},
+  {OceanColors_p, LINEARBLEND_NOWRAP},
+  {ForestColors_p, LINEARBLEND_NOWRAP}
+}};
 
 void delayed_eeprom_write() {
   constexpr auto EEPROM_DELAY = 10 * 1000;  // 10s
@@ -79,7 +84,6 @@ BLYNK_WRITE(V3)
   int value = param.asInt();
   if ((value >= 0) && (value < (int)palette_map.size())) {
     params.palette = value;
-    active_palette = palette_map[value];
     delayed_eeprom_write();
   }
 }
@@ -208,8 +212,19 @@ void sim_timer_event()
     auto surge_brightness = surge_state(accel_values[1] * params.surge_sensitivity);
     auto total_brightness = params.base_brightness + (params.max_brightness - params.base_brightness) * surge_brightness;
 
+    auto& active_palette = palette_map[params.palette];
     for(auto i = 0U; i < NUM_LEDS; ++i) {
-      leds[i] = ColorFromPalette(*active_palette, (led_values[i] / 40) % 256, std::min((int) total_brightness, 255));
+      // Local "nowrap"
+      auto led_value = led_values[i] / 40;  // temperature to color scale
+      if (active_palette.blend_type == LINEARBLEND_NOWRAP) {
+        // clamp values
+        led_value = min(240, max(0, led_value));  // Cap at 240, because 240-255 is "wrapping" back to 0.
+      } else {
+      // just use LSBs - let noise "wrap"
+        led_value &= 0xFF;
+      }
+
+      leds[i] = ColorFromPalette(active_palette.palette, static_cast<uint8>(led_value), std::min((int) total_brightness, 255), LINEARBLEND);
     }
 
     //sparkle(leds);
