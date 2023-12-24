@@ -44,32 +44,36 @@ params_t params = {
 // Methods
 void init_params() {
     EEPROM.begin(EEPROM_CONFIG_START + (NUM_SLOTS * EEPROM_PARAM_STRIDE));
-    load_params(0);
+    params = load_params(0);
 }
 
-void load_params(unsigned slot) {
-  if (slot >= NUM_SLOTS) return;
-    auto addr = EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE;
-    // Check the magic number
-    decltype(params.magic) magic;
-    EEPROM.get(addr, magic);
+params_t load_params(unsigned slot) {
+  if (slot >= NUM_SLOTS) return params_t { 0 };  
+  params_t result;
 
-    if (magic == EEPROM_MAGIC + EEPROM_CURRENT_VERSION) {
-        // Just read 'em in
-        EEPROM.get(addr, params);
-    }
-    // No dice, check old versions
-    else if (magic == EEPROM_MAGIC + 0) {
-        auto old_params = params_v0 {};
-        EEPROM.get(addr, old_params);
-        // Copy the known values
-        memcpy(&params.gyro_offset, &old_params.gyro_offset, sizeof(params.gyro_offset));
-        memcpy(&params.accel_offset, &old_params.accel_offset, sizeof(params.accel_offset));
-    }
+  auto addr = EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE;
+  // Check the magic number
+  EEPROM.get(addr, result.magic);
+
+  if (result.magic == EEPROM_MAGIC + EEPROM_CURRENT_VERSION) {
+      // Just read 'em in
+      EEPROM.get(addr, result);
+  }
+  // No dice, check old versions
+  else if (result.magic == EEPROM_MAGIC + 0) {
+      auto old_params = params_v0 {};
+      EEPROM.get(addr, old_params);      
+      // Copy the known values
+      result = params;  // keep other values
+      memcpy(&result.gyro_offset, &old_params.gyro_offset, sizeof(result.gyro_offset));
+      memcpy(&result.accel_offset, &old_params.accel_offset, sizeof(result.accel_offset));
+  }
+  return result;
 }
 
-void save_params(unsigned slot) {
-  if (slot >= NUM_SLOTS) return;
-  EEPROM.put(EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE, params);
+bool save_params(unsigned slot, const params_t& values) {
+  if (slot >= NUM_SLOTS) return false;
+  EEPROM.put(EEPROM_CONFIG_START + slot * EEPROM_PARAM_STRIDE, values);
   EEPROM.commit();
+  return true;
 }

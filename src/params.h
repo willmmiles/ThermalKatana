@@ -31,5 +31,5 @@ extern params_t params;
 
 // Methods
 void init_params();
-void load_params(unsigned slot);
-void save_params(unsigned slot);
+params_t load_params(unsigned slot);
+bool save_params(unsigned slot, const params_t&);

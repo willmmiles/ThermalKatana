@@ -59,7 +59,7 @@ void delayed_eeprom_write() {
   } else {
     timer_handle = timer_core.setTimeout(EEPROM_DELAY, [&](){
       Serial.printf("[%ld] Saving state\n", millis());
-      save_params(0);
+      save_params(0, params);
       // invalidate handle
       timer_handle = BlynkTimer::Handle {}; 
     });
@@ -110,18 +110,18 @@ BLYNK_WRITE(V13) {  params.cool_min  = param.asFloat(); set_cool_min(params.cool
 BLYNK_WRITE(V14) {  params.cool_max  = param.asFloat(); set_cool_max(params.cool_max); delayed_eeprom_write(); };
 
 
-static void apply_params() {
+static void apply_params(params_t& new_params) {
   // Apply the params we just loaded
-  set_target_temperature(params.target_temperature);
-  set_kd(params.blade_kd);
-  set_ki(params.blade_ki);
-  set_cool_min(params.cool_min);
-  set_cool_max(params.cool_max);
+  set_target_temperature(new_params.target_temperature);
+  set_kd(new_params.blade_kd);
+  set_ki(new_params.blade_ki);
+  set_cool_min(new_params.cool_min);
+  set_cool_max(new_params.cool_max);
 
   // We don't load the gyro parameters - restore them from the device
   for (auto i = 0; i < 3; ++i) {
-    params.gyro_offset[i] = dmp_get_offset(static_cast<dmp_axis>(i));
-    params.accel_offset[i] = dmp_get_offset(static_cast<dmp_axis>(i+3));
+    new_params.gyro_offset[i] = dmp_get_offset(static_cast<dmp_axis>(i));
+    new_params.accel_offset[i] = dmp_get_offset(static_cast<dmp_axis>(i+3));
   }
 
   // Notify Blynk of our newly-loaded values
@@ -133,20 +133,20 @@ static void apply_params() {
   timer_handle = timer_core.setTimer(100, [=]() mutable {
     Serial.printf("[%ld] Updating %d\n", millis(), update_pin);
     switch(update_pin) {
-      case 0: Blynk.virtualWrite(V0, params.target_temperature); break;
-      case 1: Blynk.virtualWrite(V1, params.blade_kd); break;
-      case 2: Blynk.virtualWrite(V2, params.blade_ki); break;
-      case 3: Blynk.virtualWrite(V3, params.palette); break;
-      case 4: Blynk.virtualWrite(V4, params.base_brightness); break;
-      case 5: Blynk.virtualWrite(V5, params.max_brightness); break;
-      case 6: Blynk.virtualWrite(V6, params.acc_sensitivity); break;
-      case 7: Blynk.virtualWrite(V7, params.gyro_sensitivity); break;
-      case 8: Blynk.virtualWrite(V8, params.surge_sensitivity); break;
-      case 9: Blynk.virtualWrite(V10, params.fwd_color_scale); break;
-      case 10: Blynk.virtualWrite(V11, params.back_color_scale); break;
-      case 11: Blynk.virtualWrite(V12, params.surge_falloff); break;
-      case 12: Blynk.virtualWrite(V13, params.cool_min); break;
-      case 13: Blynk.virtualWrite(V14, params.cool_max); break;
+      case 0: Blynk.virtualWrite(V0, new_params.target_temperature); break;
+      case 1: Blynk.virtualWrite(V1, new_params.blade_kd); break;
+      case 2: Blynk.virtualWrite(V2, new_params.blade_ki); break;
+      case 3: Blynk.virtualWrite(V3, new_params.palette); break;
+      case 4: Blynk.virtualWrite(V4, new_params.base_brightness); break;
+      case 5: Blynk.virtualWrite(V5, new_params.max_brightness); break;
+      case 6: Blynk.virtualWrite(V6, new_params.acc_sensitivity); break;
+      case 7: Blynk.virtualWrite(V7, new_params.gyro_sensitivity); break;
+      case 8: Blynk.virtualWrite(V8, new_params.surge_sensitivity); break;
+      case 9: Blynk.virtualWrite(V10, new_params.fwd_color_scale); break;
+      case 10: Blynk.virtualWrite(V11, new_params.back_color_scale); break;
+      case 11: Blynk.virtualWrite(V12, new_params.surge_falloff); break;
+      case 12: Blynk.virtualWrite(V13, new_params.cool_min); break;
+      case 13: Blynk.virtualWrite(V14, new_params.cool_max); break;
       default:
         // nope
         ;
@@ -180,7 +180,7 @@ BLYNK_WRITE_DEFAULT() {
   if ((pin >= 60) && (pin < 70)) {
     // save params
     if (param.asInt() != 0) {
-      save_params(pin - 60);
+      save_params(pin - 60, params);
       Serial.printf("[%ld] Saved slot %d\n",millis(),pin-60);
     }
     return;
@@ -191,8 +191,8 @@ BLYNK_WRITE_DEFAULT() {
     // save params
     if (param.asInt() != 0) {
       Serial.printf("[%ld] Loading slot %d\n",millis(),pin-70);
-      load_params(pin - 70);
-      apply_params();
+      params = load_params(pin - 70);
+      apply_params(params);
     }
     return;
   }
@@ -243,6 +243,46 @@ void sim_timer_event()
 }
 
 
+void print_params(BlynkConsole& console, const params_t& params) {
+  console.printf(
+      R"json({
+  "gyro_offset": [%d, %d, %d],
+  "accel_offset": [%d, %d, %d],
+  "max_brightness": %d,
+  "base_brightness": %d,
+  "palette": %d,
+  "target_temperature": %d,
+  "blade_ki": %f,
+  "blade_kd": %f,
+)json",
+
+    params.gyro_offset[0],params.gyro_offset[1],params.gyro_offset[2],
+    params.accel_offset[0],params.accel_offset[1],params.accel_offset[2],
+    params.max_brightness, params.base_brightness,
+    params.palette,
+    params.target_temperature,
+    params.blade_ki, params.blade_kd);
+
+  console.printf(
+      R"json(  "acc_sensitivity": %f,
+  "gyro_sensitivity": %f,
+  "fwd_color_scale": %d,
+  "back_color_scale": %d,
+  "surge_falloff": %f,
+  "surge_sensitivity": %f,
+  "cool_min": %f,
+  "cool_max": %f
+})json" "\n",
+    params.acc_sensitivity, params.gyro_sensitivity,
+    params.fwd_color_scale, params.back_color_scale,
+    params.surge_falloff, params.surge_sensitivity,
+    params.cool_min, params.cool_max
+  );
+}
+
+
+
+
 void setup() {
   Serial.begin(115200);
   Serial.printf("Starting up!\n");
@@ -257,9 +297,35 @@ void setup() {
   // embiggen the eeprom range for dmp calibration
   init_params();
   init_dmp(params.gyro_offset, params.accel_offset);
-  apply_params(); // apply other parameters
+  apply_params(params); // apply other parameters
 
   timer_core.setInterval(20L, sim_timer_event);    
+
+  edgentConsole.addCommand("preset", [](int argc, const char** argv){
+    auto preset = (argc >= 2) ? atoi(argv[1]) : 0;
+    if (argc < 1 || 0 == strcmp(argv[0], "print")) {
+      auto data = load_params(preset);
+      if (data.magic != 0) {
+        print_params(edgentConsole, data);
+      } else {
+        edgentConsole.print(R"json({"status":"error","msg":"invalid or uninitialized slot"})json" "\n");
+      }
+    } else if (0 == strcmp(argv[0], "load")) {
+      auto data = load_params(preset);
+      if (data.magic != 0) {
+        params = data;
+        apply_params(params);
+        print_params(edgentConsole, params);
+      } else {
+        edgentConsole.print(R"json({"status":"error","msg":"invalid or uninitialized slot"})json" "\n");
+      }
+    } else if (0 == strcmp(argv[0], "save")) {
+      if (save_params(preset, params)) 
+        edgentConsole.printf(R"json({"status":"OK","msg":"params saved to slot %d"})json" "\n", preset);
+      else
+        edgentConsole.print(R"json({"status":"error","msg":"invalid slot"})json" "\n");
+    };
+  });
 };
 
 
