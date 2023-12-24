@@ -1,0 +1,57 @@
+preset print 0
+{
+  "gyro_offset": [94, -20, -20],
+  "accel_offset": [1323, -385, 1505],
+  "max_brightness": 134,
+  "base_brightness": 20,
+  "palette": 2,
+  "target_temperature": 4276,
+  "blade_ki": 0.100000,
+  "blade_kd": 0.100000,
+  "acc_sensitivity": 0.084000,
+  "gyro_sensitivity": 0.001000,
+  "fwd_color_scale": -59,
+  "back_color_scale": -50,
+  "surge_falloff": 0.500000,
+  "surge_sensitivity": 0.300000,
+  "cool_min": 1.000000,
+  "cool_max": 13.000000
+}
+>preset print 1
+{
+  "gyro_offset": [94, -20, -20],
+  "accel_offset": [1323, -385, 1505],
+  "max_brightness": 100,
+  "base_brightness": 10,
+  "palette": 2,
+  "target_temperature": 8813,
+  "blade_ki": 0.000000,
+  "blade_kd": 1.000000,
+  "acc_sensitivity": 204.000000,
+  "gyro_sensitivity": 0.001000,
+  "fwd_color_scale": -500,
+  "back_color_scale": -50,
+  "surge_falloff": 0.100000,
+  "surge_sensitivity": 0.027100,
+  "cool_min": 0.000000,
+  "cool_max": 0.000000
+}
+>preset print 2
+{
+  "gyro_offset": [94, -20, -20],
+  "accel_offset": [1323, -385, 1505],
+  "max_brightness": 100,
+  "base_brightness": 10,
+  "palette": 1,
+  "target_temperature": 5947,
+  "blade_ki": 0.050000,
+  "blade_kd": 0.100000,
+  "acc_sensitivity": 204.000000,
+  "gyro_sensitivity": 0.001000,
+  "fwd_color_scale": -500,
+  "back_color_scale": -50,
+  "surge_falloff": 0.100000,
+  "surge_sensitivity": 0.027100,
+  "cool_min": 1.000000,
+  "cool_max": 2.000000
+}
